@@ -64,7 +64,7 @@ def show_validation(validation):
     with st.sidebar.expander("Data validation", expanded=False):
         for item in validation:
             icon = {"green": "[OK]", "yellow": "[WARN]", "red": "[MISSING]"}.get(item.status, "[INFO]")
-            st.caption(f"{icon} {item.tab_name}: {item.message}")
+            st.caption(f"{icon} {item.message}")
             if item.required_missing:
                 st.caption(f"Missing required: {', '.join(item.required_missing)}")
             if item.optional_missing:

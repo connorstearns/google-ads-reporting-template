@@ -71,9 +71,12 @@ def infer_conversion_type(value):
 
 
 def combine_primary_data(data):
-    campaign = prepare_performance(apply_conversion_mapping(data.get("campaign", pd.DataFrame()), data.get("conversion_mapping", pd.DataFrame())))
-    if campaign.empty and not data.get("objective", pd.DataFrame()).empty:
-        campaign = prepare_performance(data["objective"])
-    search = prepare_performance(data.get("search", pd.DataFrame()))
-    landing = prepare_performance(data.get("landing", pd.DataFrame()))
+    campaign_df = data.get("campaign_performance", data.get("campaign", pd.DataFrame()))
+    conversion_mapping = data.get("conversion_action_mapping", data.get("conversion_mapping", pd.DataFrame()))
+    objective_df = data.get("objective_performance", data.get("objective", pd.DataFrame()))
+    campaign = prepare_performance(apply_conversion_mapping(campaign_df, conversion_mapping))
+    if campaign.empty and not objective_df.empty:
+        campaign = prepare_performance(objective_df)
+    search = prepare_performance(data.get("search_terms", data.get("search", pd.DataFrame())))
+    landing = prepare_performance(data.get("landing_pages", data.get("landing", pd.DataFrame())))
     return campaign, search, landing

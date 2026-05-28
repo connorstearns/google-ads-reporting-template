@@ -46,16 +46,18 @@ COLUMN_ALIASES = {
 
 
 REQUIRED_COLUMNS = {
-    "campaign": {"campaign", "spend", "impressions", "clicks", "conversions"},
-    "search": {"search_term", "campaign", "spend", "impressions", "clicks", "conversions"},
-    "landing": {"final_url", "campaign", "spend", "impressions", "clicks", "conversions"},
+    "campaign_performance": {"campaign", "spend", "impressions", "clicks", "conversions"},
+    "objective_performance": {"spend", "impressions", "clicks", "conversions"},
+    "search_terms": {"search_term", "campaign", "spend", "impressions", "clicks", "conversions"},
+    "landing_pages": {"final_url", "campaign", "spend", "impressions", "clicks", "conversions"},
 }
 
 
 OPTIONAL_COLUMNS = {
-    "campaign": {"date", "ad_group", "objective", "network", "device", "conversion_action", "final_url"},
-    "search": {"date", "ad_group", "objective", "match_type", "search_term_category"},
-    "landing": {"date", "objective", "page_group"},
+    "campaign_performance": {"date", "ad_group", "objective", "network", "device", "conversion_action", "final_url"},
+    "objective_performance": {"date", "month", "objective", "campaign"},
+    "search_terms": {"date", "ad_group", "objective", "match_type", "search_term_category"},
+    "landing_pages": {"date", "objective", "page_group"},
 }
 
 
@@ -102,13 +104,13 @@ def coerce_types(df):
 
 def validate_dataframe(tab_key, tab_name, df):
     if df is None or df.empty:
-        return ValidationResult(tab_key, tab_name, "red", [], [], "Tab is empty or unavailable.")
+        return ValidationResult(tab_key, tab_name, "red", [], [], f"{tab_key} loaded from {tab_name} but is empty.")
     required = REQUIRED_COLUMNS.get(tab_key, set())
     optional = OPTIONAL_COLUMNS.get(tab_key, set())
     missing_required = sorted(required - set(df.columns))
     missing_optional = sorted(optional - set(df.columns))
     if missing_required:
-        return ValidationResult(tab_key, tab_name, "red", missing_required, missing_optional, "Required fields missing.")
+        return ValidationResult(tab_key, tab_name, "red", missing_required, missing_optional, f"{tab_key} loaded from {tab_name} with required fields missing: {', '.join(missing_required)}")
     if missing_optional:
-        return ValidationResult(tab_key, tab_name, "yellow", [], missing_optional, "Loaded with optional fields missing.")
-    return ValidationResult(tab_key, tab_name, "green", [], [], "Loaded successfully.")
+        return ValidationResult(tab_key, tab_name, "yellow", [], missing_optional, f"{tab_key} loaded from {tab_name} with optional fields missing: {', '.join(missing_optional)}")
+    return ValidationResult(tab_key, tab_name, "green", [], [], f"{tab_key} loaded from {tab_name}")

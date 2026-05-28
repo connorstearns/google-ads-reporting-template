@@ -59,11 +59,11 @@ def _worksheet_to_dataframe(worksheet):
 
 def _missing_tab_result(tab_key):
     expected = EXPECTED_MODEL_TABS.get(tab_key, tab_key)
-    return ValidationResult(tab_key, expected, "red", [], [], "Tab is missing or unavailable.")
+    return ValidationResult(tab_key, expected, "red", [], [], f"{tab_key} missing; no configured preferred or alias tab was found.")
 
 
 def _failed_tab_result(tab_key, tab_name, exc):
-    return ValidationResult(tab_key, tab_name, "red", [], [], f"Tab failed to load: {exc}")
+    return ValidationResult(tab_key, tab_name, "red", [], [], f"{tab_key} matched {tab_name} but that tab failed to load: {exc}")
 
 
 def _open_sheet(client, spreadsheet_id):
