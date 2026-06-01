@@ -6,6 +6,7 @@ import pandas as pd
 COLUMN_ALIASES = {
     "campaign_name": "campaign",
     "campaign": "campaign",
+    "campaign_id": "campaign_id",
     "ad_group_name": "ad_group",
     "ad_group": "ad_group",
     "cost": "spend",
@@ -19,8 +20,12 @@ COLUMN_ALIASES = {
     "all_conversions": "conversions",
     "conversion_action": "conversion_action",
     "conversion_action_name": "conversion_action",
+    "conversion_type_name": "conversion_action",
+    "conversion_name": "conversion_action",
+    "conversion_tracker_name": "conversion_action",
+    "conversion_action_type": "conversion_action",
     "conversion_type": "conversion_type",
-    "conversion_category": "conversion_type",
+    "conversion_category": "conversion_category",
     "quality_conversions": "quality_conversions",
     "quality_conversions_count": "quality_conversions",
     "priority_conversions": "priority_conversions",
@@ -28,6 +33,8 @@ COLUMN_ALIASES = {
     "micro_conversions": "micro_conversions",
     "other_micro_conversions": "other_micro_conversions",
     "total_conversions": "total_conversions",
+    "primary_mapped_conversions": "primary_mapped_conversions",
+    "micro_mapped_conversions": "micro_mapped_conversions",
     "career_clicks": "career_clicks",
     "applications": "applications",
     "applications_submitted": "applications_submitted",
@@ -98,7 +105,8 @@ def coerce_types(df):
         out["date"] = pd.to_datetime(out["date"], errors="coerce")
     for col in ["spend", "impressions", "clicks", "conversions", "total_conversions", "priority_conversions",
                 "priority_cpa", "micro_conversions", "other_micro_conversions", "quality_conversions", "career_clicks", "applications",
-                "applications_submitted", "enrollment_apply_now_clicks", "enrollment_apply_clicks", "enrollment_forms"]:
+                "applications_submitted", "enrollment_apply_now_clicks", "enrollment_apply_clicks", "enrollment_forms",
+                "primary_mapped_conversions", "micro_mapped_conversions"]:
         if col in out.columns:
             out[col] = (
                 out[col].astype(str)

@@ -134,6 +134,7 @@ def load_workbook(spreadsheet_id=None):
         "loaded_tab_count": sum(1 for df in all_tabs.values() if not df.empty),
         "cache_ttl_seconds": CACHE_TTL_SECONDS,
     }
+    data["_metadata"] = metadata
     return data, validation, metadata
 
 

@@ -161,6 +161,8 @@ The app reads data only through `src/google_sheets.py::load_workbook()`. That fu
 
 The dashboard emphasizes HCZ priority outcomes over raw conversion volume. Enrollment priority conversions are Apply Now clicks plus Enrollment Forms. Recruitment priority conversions are Applications Submitted. Career Clicks remain visible as a mid-funnel recruitment intent metric but do not count as priority conversions. Conversion classification is centralized in `src/conversion_logic.py`: it prefers `map_conversion_actions`, then `model_conversion_quality`, and only uses cautious keyword inference when mapping data is unavailable.
 
+Campaign media and conversion outcomes are modeled separately. `model_campaign_daily` supplies spend, impressions, and clicks. `model_conversion_quality` or its fallback supplies conversion-action detail. The app builds a standardized outcome rollup and joins it to campaign media using the strongest shared grain available: campaign ID plus date, campaign plus date, campaign ID plus month, campaign plus month, then campaign only as a last resort. When multiple media rows share a join grain, outcome counts are allocated across those rows so campaign totals are not duplicated.
+
 The review queue uses configurable thresholds for spend, Priority CPA, CTR, CPC, minimum clicks, and minimum priority conversions. It prioritizes actionable issues such as high spend with no priority conversions, unmapped entities, inefficient Priority CPA, and low CTR.
 
 ## Adding New Model Tabs

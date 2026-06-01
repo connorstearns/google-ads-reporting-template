@@ -1,6 +1,11 @@
 import re
 import pandas as pd
-from .conversion_logic import classify_conversion_rows
+from .conversion_logic import (
+    build_conversion_outcome_rollup,
+    classify_conversion_rows,
+    join_conversion_outcomes,
+    validate_priority_business_rules,
+)
 from .metrics import add_core_metrics
 
 
@@ -58,9 +63,20 @@ def combine_primary_data(data):
     conversion_mapping = data.get("conversion_action_mapping", data.get("conversion_mapping", pd.DataFrame()))
     conversion_quality = data.get("conversion_quality", pd.DataFrame())
     objective_df = data.get("objective_performance", data.get("objective", pd.DataFrame()))
-    campaign = prepare_performance(apply_conversion_mapping(campaign_df, conversion_mapping, conversion_quality))
+    campaign_media = prepare_performance(campaign_df)
+    if not conversion_quality.empty:
+        conversion_rollup = build_conversion_outcome_rollup(conversion_quality, conversion_mapping)
+        campaign = join_conversion_outcomes(campaign_media, conversion_rollup)
+    else:
+        campaign = prepare_performance(apply_conversion_mapping(campaign_df, conversion_mapping))
     if campaign.empty and not objective_df.empty:
         campaign = prepare_performance(objective_df)
+    debug = campaign.attrs.get("conversion_join_debug", {})
+    metadata = data.get("_metadata", {})
+    debug["campaign_media_tab"] = metadata.get("tab_aliases", {}).get("campaign_performance", "campaign_performance")
+    debug["conversion_outcomes_tab"] = metadata.get("tab_aliases", {}).get("conversion_quality", "conversion_quality")
+    debug["business_rule_issues"] = validate_priority_business_rules(campaign)
+    campaign.attrs["conversion_join_debug"] = debug
     search = prepare_performance(apply_conversion_mapping(data.get("search_terms", data.get("search", pd.DataFrame())), conversion_mapping, conversion_quality))
     landing = prepare_performance(apply_conversion_mapping(data.get("landing_pages", data.get("landing", pd.DataFrame())), conversion_mapping, conversion_quality))
     return campaign, search, landing

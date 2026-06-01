@@ -9,7 +9,7 @@ from src.charts import (
 )
 from src.conversion_logic import conversion_debug_audit, objective_diagnostic_flags, recommended_objective_action
 from src.filters import apply_global_filters, render_sidebar
-from src.formatting import PRIORITY_CONVERSIONS_HELP, apply_page_style, kpi_card, money, number
+from src.formatting import PRIORITY_CONVERSIONS_HELP, apply_page_style, kpi_card, money, number, render_conversion_model_debug
 from src.google_sheets import load_workbook
 from src.metrics import summarize
 from src.tables import render_table
@@ -120,15 +120,12 @@ campaign_perf = summarize(campaign, ["objective", "campaign"])
 st.plotly_chart(campaign_priority_cpa_bar(campaign_perf, 0, 1, "Priority CPA by campaign with priority conversions"), use_container_width=True)
 
 with st.expander("Debug conversion classification", expanded=False):
-    st.caption("Audit which conversion actions were assigned to each standardized bucket and whether mapping or inferred logic supplied the classification.")
-    audit = conversion_debug_audit(campaign)
+    render_conversion_model_debug(campaign)
+    st.subheader("Conversion classification audit")
+    audit = pd.DataFrame(campaign.attrs.get("conversion_audit", []))
     if audit.empty:
-        st.info("Conversion-action detail is not available in the current campaign dataset.")
+        audit = conversion_debug_audit(campaign)
+    if audit.empty:
+        st.info("Conversion-action detail is not available in the conversion outcome dataset.")
     else:
         st.dataframe(audit, use_container_width=True, hide_index=True)
-        unmapped = audit[audit.get("conversion_mapping_status", pd.Series(index=audit.index, dtype=str)).eq("Unmapped")]
-        st.subheader("Unmapped conversion actions")
-        if unmapped.empty:
-            st.success("No unmapped conversion actions are present in the filtered campaign data.")
-        else:
-            st.dataframe(unmapped, use_container_width=True, hide_index=True)

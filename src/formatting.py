@@ -1,4 +1,5 @@
 import math
+import pandas as pd
 import streamlit as st
 
 
@@ -81,3 +82,37 @@ def metric_column_config():
         "other_micro_conversions": st.column_config.NumberColumn("Other / Micro Conversions", format="%.1f"),
         "priority_score": st.column_config.NumberColumn("Priority Score", format="%d"),
     }
+
+
+def render_conversion_model_debug(campaign):
+    debug = campaign.attrs.get("conversion_join_debug", {})
+    audit = pd.DataFrame(campaign.attrs.get("conversion_audit", []))
+    st.caption("Inspect the physical inputs, join grain, standardized outcome totals, and unmapped conversion actions.")
+    st.write(f"Campaign media tab: `{debug.get('campaign_media_tab', 'Unknown')}`")
+    st.write(f"Conversion outcomes tab: `{debug.get('conversion_outcomes_tab', 'Unknown')}`")
+    st.write(f"Join keys: `{', '.join(debug.get('join_keys', [])) or 'No conversion outcome join'}`")
+    st.write(f"Matched media rows: `{debug.get('matched_media_rows', 0)}` of `{debug.get('media_rows', len(campaign))}`")
+    totals = campaign[[
+        "enrollment_apply_now_clicks", "enrollment_forms", "applications_submitted", "career_clicks", "priority_conversions"
+    ]].sum()
+    cols = st.columns(5)
+    with cols[0]: st.metric("Apply Now Clicks", f"{totals['enrollment_apply_now_clicks']:,.1f}")
+    with cols[1]: st.metric("Enrollment Forms", f"{totals['enrollment_forms']:,.1f}")
+    with cols[2]: st.metric("Applications Submitted", f"{totals['applications_submitted']:,.1f}")
+    with cols[3]: st.metric("Career Clicks", f"{totals['career_clicks']:,.1f}")
+    with cols[4]: st.metric("Priority Conversions", f"{totals['priority_conversions']:,.1f}")
+    issues = debug.get("business_rule_issues", [])
+    if issues:
+        for issue in issues:
+            st.error(issue)
+    else:
+        st.success("Priority conversion sanity checks passed.")
+    st.subheader("Top unmapped conversion actions")
+    if audit.empty or "conversion_mapping_status" not in audit.columns:
+        st.info("Conversion-action audit detail is not available.")
+        return
+    unmapped = audit[audit["conversion_mapping_status"].eq("Unmapped")].head(25)
+    if unmapped.empty:
+        st.success("No unmapped conversion actions are present.")
+    else:
+        st.dataframe(unmapped, use_container_width=True, hide_index=True)

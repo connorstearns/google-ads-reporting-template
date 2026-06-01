@@ -9,7 +9,7 @@ from src.charts import (
     campaign_status_spend_bar,
 )
 from src.filters import apply_global_filters, render_sidebar
-from src.formatting import PRIORITY_CONVERSIONS_HELP, apply_page_style, kpi_card, money, number
+from src.formatting import PRIORITY_CONVERSIONS_HELP, apply_page_style, kpi_card, money, number, render_conversion_model_debug
 from src.google_sheets import load_workbook
 from src.metrics import summarize
 from src.tables import render_table
@@ -41,7 +41,6 @@ except Exception as exc:
     st.exception(exc)
     st.stop()
 
-source_campaign = data.get("campaign_performance", data.get("campaign", pd.DataFrame()))
 campaign, search, landing = combine_primary_data(data)
 filters = render_sidebar([campaign, search, landing], validation, thresholds=True)
 campaign = apply_global_filters(campaign, filters)
@@ -50,7 +49,7 @@ if campaign.empty:
     st.warning("No campaign performance data is available with the current filters.")
     st.stop()
 
-missing_optional = missing_optional_campaign_fields(source_campaign)
+missing_optional = missing_optional_campaign_fields(campaign)
 if missing_optional:
     st.warning(
         "Some optional campaign fields are unavailable, so safe fallbacks are being used: "
@@ -118,14 +117,17 @@ render_table(
 )
 
 with st.expander("Supporting campaign views", expanded=False):
-    tab1, tab2, tab3, tab4 = st.tabs(["Highest spend", "Highest priority conversions", "High CPA", "Zero priority conversions"])
+    tab1, tab2, tab3, tab4 = st.tabs(["Highest spend", "Highest priority conversions", "High Priority CPA", "Zero priority conversions"])
     with tab1:
         render_table(campaign_level.sort_values("spend", ascending=False).head(50), "Highest spend", key="highest_spend")
     with tab2:
         render_table(campaign_level.sort_values("priority_conversions", ascending=False).head(50), "Highest priority conversions", key="highest_priority_conversions")
     with tab3:
-        meaningful = campaign_level[(campaign_level["spend"] >= thresholds["min_spend"]) & (campaign_level["conversions"] > 0)]
-        render_table(meaningful.sort_values("cpa", ascending=False).head(50), "High CPA", key="high_cpa")
+        meaningful = campaign_level[(campaign_level["spend"] >= thresholds["min_spend"]) & (campaign_level["priority_conversions"] > 0)]
+        render_table(meaningful.sort_values("priority_cpa", ascending=False).head(50), "High Priority CPA", key="high_priority_cpa")
     with tab4:
         zero_priority = campaign_level[(campaign_level["spend"] > 0) & (campaign_level["priority_conversions"] == 0)]
         render_table(zero_priority.sort_values("spend", ascending=False).head(50), "Zero priority conversions", key="zero_priority_conversions")
+
+with st.expander("Debug conversion outcome join", expanded=False):
+    render_conversion_model_debug(campaign)
