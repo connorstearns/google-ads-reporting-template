@@ -24,7 +24,7 @@ DECISION_COLUMNS = [
     "status", "objective", "campaign", "ad_group", "spend", "spend_share", "impressions",
     "clicks", "ctr", "cpc", "total_conversions", "priority_conversions", "priority_cpa",
     "enrollment_apply_now_clicks", "enrollment_forms", "applications_submitted", "career_clicks",
-    "micro_conversions", "cvr", "cpa",
+    "other_micro_conversions", "cvr", "cpa",
     "primary_issue", "recommended_action",
 ]
 

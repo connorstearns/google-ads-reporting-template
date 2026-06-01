@@ -7,6 +7,9 @@ def add_review_flags(df, entity_col, entity_type, thresholds):
         return pd.DataFrame()
     group_cols = ["objective", entity_col] if "objective" in df.columns else [entity_col]
     perf = summarize(df, group_cols)
+    unmapped_entities = set()
+    if "conversion_mapping_status" in df.columns:
+        unmapped_entities = set(df.loc[df["conversion_mapping_status"].eq("Unmapped"), entity_col].dropna())
     rows = []
     for _, r in perf.iterrows():
         issues = []
@@ -16,11 +19,13 @@ def add_review_flags(df, entity_col, entity_type, thresholds):
         if r.spend >= thresholds["min_spend"] and r.priority_conversions == 0:
             issues.append(("High spend, no priority conversions", 3, "Investigate priority conversion path"))
         if entity_type == "Campaign" and r.get("objective") == "Enrollment" and r.enrollment_apply_now_clicks == 0 and r.enrollment_forms == 0:
-            issues.append(("Enrollment campaign missing Apply Now clicks/forms", 2, "Review enrollment conversion path"))
+            issues.append(("Enrollment: Spend with no enrollment priority action", 2, "Review enrollment conversion path"))
+        if entity_type == "Campaign" and r.get("objective") == "Enrollment" and r.enrollment_apply_now_clicks > 0 and r.enrollment_forms == 0:
+            issues.append(("Enrollment: Apply Now clicks but no forms", 2, "Review enrollment form completion path"))
         if entity_type == "Campaign" and r.get("objective") == "Recruitment" and r.applications_submitted == 0:
-            issues.append(("Recruitment campaign missing applications submitted", 2, "Review application submission tracking and funnel"))
+            issues.append(("Recruitment: Spend with no applications submitted", 2, "Review application submission tracking and funnel"))
         if entity_type == "Campaign" and r.career_clicks > 0 and r.applications_submitted == 0:
-            issues.append(("Career clicks present but no applications submitted", 2, "Review recruitment landing page and application flow"))
+            issues.append(("Recruitment: Career clicks but no applications submitted", 2, "Review recruitment landing page and application flow"))
         if r.total_conversions > 0 and r.priority_conversions == 0:
             issues.append(("Total conversions present but no priority conversions", 2, "Check conversion action mapping and optimization goals"))
         if r.priority_conversions > 0 and r.priority_cpa > thresholds["priority_cpa"]:
@@ -31,6 +36,8 @@ def add_review_flags(df, entity_col, entity_type, thresholds):
             issues.append(("CPC above threshold", 1, "Check auction pressure and keyword match quality"))
         if str(r.get("objective", "")).startswith("Other"):
             issues.append(("Unmapped objective", 2, "Map objective"))
+        if r[entity_col] in unmapped_entities:
+            issues.append(("Conversion action unmapped", 2, "Complete conversion action mapping"))
         for issue, points, action in issues:
             rows.append({
                 "priority_score": score + points,

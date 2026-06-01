@@ -8,7 +8,7 @@ OPTIONAL_CAMPAIGN_FIELDS = [
     "enrollment_forms",
     "career_clicks",
     "applications_submitted",
-    "micro_conversions",
+    "other_micro_conversions",
     "objective",
     "ad_group",
 ]
@@ -45,7 +45,9 @@ def ensure_campaign_fields(df):
         out["enrollment_apply_now_clicks"] = out.get("enrollment_apply_clicks", 0)
     if "applications_submitted" not in out.columns:
         out["applications_submitted"] = out.get("applications", 0)
-    for col in ["priority_conversions", "enrollment_forms", "career_clicks", "applications_submitted", "micro_conversions"]:
+    if "other_micro_conversions" not in out.columns:
+        out["other_micro_conversions"] = out.get("micro_conversions", 0)
+    for col in ["priority_conversions", "enrollment_forms", "career_clicks", "applications_submitted", "other_micro_conversions"]:
         if col not in out.columns:
             out[col] = 0
     return out

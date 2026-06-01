@@ -1,5 +1,6 @@
 import re
 import pandas as pd
+from .conversion_logic import classify_conversion_rows
 from .metrics import add_core_metrics
 
 
@@ -33,41 +34,8 @@ def prepare_performance(df):
     return add_core_metrics(out)
 
 
-def apply_conversion_mapping(df, mapping):
-    out = df.copy()
-    if out.empty:
-        return out
-    has_conversion_detail = "conversion_action" in out.columns or "conversion_type" in out.columns
-    if not has_conversion_detail:
-        return out
-    if "conversion_type" not in out.columns:
-        out["conversion_type"] = "Other / Unmapped"
-    out["conversion_mapping_status"] = "Inferred"
-    if not mapping.empty and {"conversion_action", "conversion_type"}.issubset(mapping.columns) and "conversion_action" in out.columns:
-        map_df = mapping[["conversion_action", "conversion_type"]].drop_duplicates()
-        out = out.drop(columns=["conversion_type"], errors="ignore").merge(map_df, on="conversion_action", how="left")
-        out["conversion_type"] = out["conversion_type"].fillna("Other / Unmapped")
-        out["conversion_mapping_status"] = out["conversion_type"].where(out["conversion_type"].eq("Other / Unmapped"), "Mapped")
-    elif "conversion_action" in out.columns:
-        out["conversion_type"] = out["conversion_action"].apply(infer_conversion_type)
-    buckets = out.apply(lambda row: infer_standard_conversion_metric(row.get("conversion_action"), row.get("conversion_type")), axis=1)
-    for metric in ["enrollment_apply_now_clicks", "enrollment_forms", "applications_submitted", "career_clicks", "micro_conversions"]:
-        out[metric] = out["conversions"].where(buckets.eq(metric), 0)
-    out["total_conversions"] = out["conversions"]
-    return out
-
-
-def infer_standard_conversion_metric(action, conversion_type=""):
-    text = f"{action or ''} {conversion_type or ''}".lower()
-    if re.search(r"application.{0,12}(submit|complete)|submit.{0,12}application|recruitment lead", text):
-        return "applications_submitted"
-    if re.search(r"career|job|teacher|recruit", text) and re.search(r"click|opportunit|intent", text):
-        return "career_clicks"
-    if re.search(r"enroll|scholar|lottery|kindergarten|k-8|promise academy", text) and re.search(r"form|lead", text):
-        return "enrollment_forms"
-    if re.search(r"apply now|apply_now|enrollment intent", text):
-        return "enrollment_apply_now_clicks"
-    return "micro_conversions"
+def apply_conversion_mapping(df, mapping, conversion_quality=None):
+    return classify_conversion_rows(df, mapping, conversion_quality)
 
 
 def infer_conversion_type(value):
@@ -88,10 +56,11 @@ def infer_conversion_type(value):
 def combine_primary_data(data):
     campaign_df = data.get("campaign_performance", data.get("campaign", pd.DataFrame()))
     conversion_mapping = data.get("conversion_action_mapping", data.get("conversion_mapping", pd.DataFrame()))
+    conversion_quality = data.get("conversion_quality", pd.DataFrame())
     objective_df = data.get("objective_performance", data.get("objective", pd.DataFrame()))
-    campaign = prepare_performance(apply_conversion_mapping(campaign_df, conversion_mapping))
+    campaign = prepare_performance(apply_conversion_mapping(campaign_df, conversion_mapping, conversion_quality))
     if campaign.empty and not objective_df.empty:
         campaign = prepare_performance(objective_df)
-    search = prepare_performance(data.get("search_terms", data.get("search", pd.DataFrame())))
-    landing = prepare_performance(data.get("landing_pages", data.get("landing", pd.DataFrame())))
+    search = prepare_performance(apply_conversion_mapping(data.get("search_terms", data.get("search", pd.DataFrame())), conversion_mapping, conversion_quality))
+    landing = prepare_performance(apply_conversion_mapping(data.get("landing_pages", data.get("landing", pd.DataFrame())), conversion_mapping, conversion_quality))
     return campaign, search, landing

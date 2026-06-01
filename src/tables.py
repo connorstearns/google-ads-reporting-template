@@ -6,7 +6,8 @@ from .formatting import metric_column_config
 IDENTITY_ORDER = ["date", "week", "month", "objective", "campaign", "ad_group", "search_term", "final_url", "conversion_action"]
 METRIC_ORDER = ["spend", "impressions", "clicks", "ctr", "cpc", "total_conversions", "priority_conversions",
                 "enrollment_apply_now_clicks", "enrollment_forms", "applications_submitted", "career_clicks",
-                "micro_conversions", "cvr", "cpa", "priority_cpa"]
+                "other_micro_conversions", "cvr", "cpa", "priority_cpa", "cost_per_enrollment_apply_click",
+                "cost_per_enrollment_form", "cost_per_application_submitted", "cost_per_career_click"]
 FLAG_ORDER = ["status", "review_flag", "primary_issue", "issue_type", "priority_score", "recommended_action", "rationale", "notes"]
 
 

@@ -60,6 +60,10 @@ def metric_column_config():
         "cpc": st.column_config.NumberColumn("CPC", format="$%.2f"),
         "cpa": st.column_config.NumberColumn("CPA", format="$%.0f"),
         "priority_cpa": st.column_config.NumberColumn("Priority CPA", format="$%.0f"),
+        "cost_per_enrollment_apply_click": st.column_config.NumberColumn("Cost per Apply Now Click", format="$%.0f"),
+        "cost_per_enrollment_form": st.column_config.NumberColumn("Cost per Enrollment Form", format="$%.0f"),
+        "cost_per_application_submitted": st.column_config.NumberColumn("Cost per Application Submitted", format="$%.0f"),
+        "cost_per_career_click": st.column_config.NumberColumn("Cost per Career Click", format="$%.0f"),
         "ctr": st.column_config.NumberColumn("CTR", format="%.2f%%"),
         "cvr": st.column_config.NumberColumn("CVR", format="%.2f%%"),
         "spend_share": st.column_config.NumberColumn("Spend Share", format="%.1f%%"),
@@ -74,6 +78,6 @@ def metric_column_config():
         "enrollment_forms": st.column_config.NumberColumn("Enrollment Forms", format="%.1f"),
         "career_clicks": st.column_config.NumberColumn("Career Clicks", format="%.1f"),
         "applications_submitted": st.column_config.NumberColumn("Applications Submitted", format="%.1f"),
-        "micro_conversions": st.column_config.NumberColumn("Other / Micro Conversions", format="%.1f"),
+        "other_micro_conversions": st.column_config.NumberColumn("Other / Micro Conversions", format="%.1f"),
         "priority_score": st.column_config.NumberColumn("Priority Score", format="%d"),
     }
