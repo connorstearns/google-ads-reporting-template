@@ -24,12 +24,15 @@ def render_sidebar(dataframes, validation=None, thresholds=False):
 
     threshold_values = DEFAULT_THRESHOLDS.copy()
     if thresholds:
-        st.sidebar.header("Review thresholds")
-        threshold_values["min_spend"] = st.sidebar.number_input("Minimum spend", min_value=0.0, value=DEFAULT_THRESHOLDS["min_spend"], step=25.0)
+        st.sidebar.header("Decision thresholds")
+        threshold_values["min_spend"] = st.sidebar.number_input("Minimum spend threshold", min_value=0.0, value=DEFAULT_THRESHOLDS["min_spend"], step=25.0)
+        threshold_values["min_clicks"] = st.sidebar.number_input("Minimum clicks threshold", min_value=0, value=DEFAULT_THRESHOLDS["min_clicks"], step=5)
         threshold_values["cpa"] = st.sidebar.number_input("CPA threshold", min_value=0.0, value=DEFAULT_THRESHOLDS["cpa"], step=25.0)
-        threshold_values["ctr"] = st.sidebar.number_input("CTR threshold", min_value=0.0, max_value=1.0, value=DEFAULT_THRESHOLDS["ctr"], step=0.005, format="%.3f")
-        threshold_values["cpc"] = st.sidebar.number_input("CPC threshold", min_value=0.0, value=DEFAULT_THRESHOLDS["cpc"], step=1.0)
-        threshold_values["min_clicks"] = st.sidebar.number_input("Minimum clicks", min_value=0, value=DEFAULT_THRESHOLDS["min_clicks"], step=5)
+        threshold_values["quality_cpa"] = st.sidebar.number_input("Quality CPA threshold", min_value=0.0, value=DEFAULT_THRESHOLDS["quality_cpa"], step=25.0)
+        threshold_values["min_quality_conversions"] = st.sidebar.number_input("Minimum quality conversions threshold", min_value=1, value=DEFAULT_THRESHOLDS["min_quality_conversions"], step=1)
+        with st.sidebar.expander("Diagnostic thresholds", expanded=False):
+            threshold_values["ctr"] = st.number_input("CTR threshold", min_value=0.0, max_value=1.0, value=DEFAULT_THRESHOLDS["ctr"], step=0.005, format="%.3f")
+            threshold_values["cpc"] = st.number_input("CPC threshold", min_value=0.0, value=DEFAULT_THRESHOLDS["cpc"], step=1.0)
 
     show_validation(validation)
     return {"date_range": date_range, "objective": objective, "campaign": campaign, "network": network, "device": device, "thresholds": threshold_values}

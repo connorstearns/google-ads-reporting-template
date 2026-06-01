@@ -5,8 +5,8 @@ from .formatting import metric_column_config
 
 IDENTITY_ORDER = ["date", "week", "month", "objective", "campaign", "ad_group", "search_term", "final_url", "conversion_action"]
 METRIC_ORDER = ["spend", "impressions", "clicks", "ctr", "cpc", "conversions", "career_clicks", "applications",
-                "enrollment_apply_now_clicks", "enrollment_forms", "quality_conversions", "cvr", "cpa", "quality_cpa"]
-FLAG_ORDER = ["status", "review_flag", "issue_type", "priority_score", "recommended_action", "notes"]
+                "enrollment_apply_clicks", "enrollment_apply_now_clicks", "enrollment_forms", "quality_conversions", "cvr", "cpa", "quality_cpa"]
+FLAG_ORDER = ["status", "review_flag", "primary_issue", "issue_type", "priority_score", "recommended_action", "rationale", "notes"]
 
 
 def ordered_columns(df):
@@ -22,7 +22,7 @@ def humanize_columns(df):
     return out
 
 
-def render_table(df, title, caption="", sort_by="spend", search_cols=None, key=None):
+def render_table(df, title, caption="", sort_by="spend", search_cols=None, key=None, display_columns=None):
     st.subheader(title)
     if caption:
         st.caption(caption)
@@ -40,7 +40,7 @@ def render_table(df, title, caption="", sort_by="spend", search_cols=None, key=N
             shown = shown[mask]
     if sort_by in shown.columns:
         shown = shown.sort_values(sort_by, ascending=False)
-    shown = shown[ordered_columns(shown)]
+    shown = shown[[c for c in (display_columns or ordered_columns(shown)) if c in shown.columns]]
     for pct_col in ["ctr", "cvr", "spend_share", "click_share", "conversion_share"]:
         if pct_col in shown.columns:
             shown[pct_col] = shown[pct_col] * 100

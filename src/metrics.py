@@ -3,7 +3,9 @@ import pandas as pd
 
 
 def safe_divide(numerator, denominator):
-    return np.where(np.asarray(denominator) == 0, 0, np.asarray(numerator) / np.asarray(denominator))
+    numerator = np.asarray(numerator)
+    denominator = np.asarray(denominator)
+    return np.divide(numerator, denominator, out=np.zeros_like(numerator, dtype=float), where=denominator != 0)
 
 
 def add_core_metrics(df):
@@ -22,7 +24,8 @@ def add_core_metrics(df):
 
 
 def infer_quality_conversions(df):
-    cols = [c for c in ["applications", "enrollment_forms", "enrollment_apply_now_clicks", "career_clicks"] if c in df.columns]
+    enrollment_click_col = "enrollment_apply_clicks" if "enrollment_apply_clicks" in df.columns else "enrollment_apply_now_clicks"
+    cols = [c for c in ["applications", "enrollment_forms", enrollment_click_col, "career_clicks"] if c in df.columns]
     if cols:
         return df[cols].sum(axis=1)
     return df.get("conversions", pd.Series(0, index=df.index))
@@ -33,7 +36,7 @@ def summarize(df, group_cols=None):
         return add_core_metrics(pd.DataFrame())
     group_cols = group_cols or []
     numeric = ["spend", "impressions", "clicks", "conversions", "quality_conversions",
-               "career_clicks", "applications", "enrollment_apply_now_clicks", "enrollment_forms"]
+               "career_clicks", "applications", "enrollment_apply_clicks", "enrollment_apply_now_clicks", "enrollment_forms"]
     agg = {c: "sum" for c in numeric if c in df.columns}
     if group_cols:
         out = df.groupby(group_cols, dropna=False, as_index=False).agg(agg)

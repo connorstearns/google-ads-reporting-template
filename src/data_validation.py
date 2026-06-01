@@ -26,6 +26,7 @@ COLUMN_ALIASES = {
     "career_clicks": "career_clicks",
     "applications": "applications",
     "enrollment_apply_now_clicks": "enrollment_apply_now_clicks",
+    "enrollment_apply_clicks": "enrollment_apply_clicks",
     "enrollment_forms": "enrollment_forms",
     "search_term": "search_term",
     "search_terms": "search_term",
@@ -90,7 +91,7 @@ def coerce_types(df):
     if "date" in out.columns:
         out["date"] = pd.to_datetime(out["date"], errors="coerce")
     for col in ["spend", "impressions", "clicks", "conversions", "quality_conversions",
-                "career_clicks", "applications", "enrollment_apply_now_clicks", "enrollment_forms"]:
+                "career_clicks", "applications", "enrollment_apply_now_clicks", "enrollment_apply_clicks", "enrollment_forms"]:
         if col in out.columns:
             out[col] = (
                 out[col].astype(str)

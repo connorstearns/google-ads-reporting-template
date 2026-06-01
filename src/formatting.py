@@ -63,4 +63,9 @@ def metric_column_config():
         "clicks": st.column_config.NumberColumn("Clicks", format="%d"),
         "conversions": st.column_config.NumberColumn("Conversions", format="%.1f"),
         "quality_conversions": st.column_config.NumberColumn("Quality Conv.", format="%.1f"),
+        "enrollment_apply_clicks": st.column_config.NumberColumn("Enrollment Apply Clicks", format="%.1f"),
+        "enrollment_forms": st.column_config.NumberColumn("Enrollment Forms", format="%.1f"),
+        "career_clicks": st.column_config.NumberColumn("Career Clicks", format="%.1f"),
+        "applications": st.column_config.NumberColumn("Applications", format="%.1f"),
+        "priority_score": st.column_config.NumberColumn("Priority Score", format="%d"),
     }
