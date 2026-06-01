@@ -58,6 +58,7 @@ def kpi_card(label, value, delta=None, help_text=None):
 def metric_column_config():
     return {
         "spend": st.column_config.NumberColumn("Spend", format="$%.0f"),
+        "cost": st.column_config.NumberColumn("Cost", format="$%.0f"),
         "cpc": st.column_config.NumberColumn("CPC", format="$%.2f"),
         "cpa": st.column_config.NumberColumn("CPA", format="$%.0f"),
         "priority_cpa": st.column_config.NumberColumn("Priority CPA", format="$%.0f"),
@@ -83,6 +84,7 @@ def metric_column_config():
         "applications_submitted": st.column_config.NumberColumn("Applications Submitted", format="%.1f"),
         "other_micro_conversions": st.column_config.NumberColumn("Other / Micro Conversions", format="%.1f"),
         "micro_conversions": st.column_config.NumberColumn("Micro Conversions", format="%.1f"),
+        "all_to_reported_conversion_ratio": st.column_config.NumberColumn("All / Reported Conversion Ratio", format="%.2f"),
         "priority_score": st.column_config.NumberColumn("Priority Score", format="%d"),
     }
 

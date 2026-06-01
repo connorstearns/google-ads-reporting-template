@@ -182,19 +182,32 @@ def _conversion_mix_label(metric):
 def objective_funnel_bar(df, objective, title):
     if df.empty or "campaign" not in df.columns:
         return go.Figure()
+    if "objective" not in df.columns:
+        return go.Figure()
     metrics = (
         ["enrollment_apply_now_clicks", "enrollment_forms"]
         if objective == "Enrollment"
         else ["career_clicks", "applications_submitted"]
     )
-    filtered = df[df["objective"].eq(objective)]
+    filtered = df[df["objective"].astype(str).eq(objective)].copy()
     if filtered.empty:
         return go.Figure()
+    for metric in metrics:
+        if metric not in filtered.columns:
+            filtered[metric] = 0
     grouped = summarize(filtered, ["campaign"])
-    grouped = grouped.melt(id_vars="campaign", value_vars=metrics, var_name="conversion_type", value_name="conversions")
+    if grouped.empty or "campaign" not in grouped.columns:
+        return go.Figure()
+    for metric in metrics:
+        if metric not in grouped.columns:
+            grouped[metric] = 0
+    available_metrics = [metric for metric in metrics if metric in grouped.columns]
+    if not available_metrics or grouped[available_metrics].sum().sum() == 0:
+        return go.Figure()
+    grouped = grouped.melt(id_vars="campaign", value_vars=available_metrics, var_name="conversion_type", value_name="outcome_conversions")
     grouped["conversion_type"] = grouped["conversion_type"].map(_conversion_mix_label)
-    fig = px.bar(grouped, x="campaign", y="conversions", color="conversion_type", barmode="group", title=title,
-                 labels={"campaign": "Campaign", "conversions": "Conversions", "conversion_type": "Outcome"})
+    fig = px.bar(grouped, x="campaign", y="outcome_conversions", color="conversion_type", barmode="group", title=title,
+                 labels={"campaign": "Campaign", "outcome_conversions": "Conversions", "conversion_type": "Outcome"})
     fig.update_xaxes(tickangle=-35)
     return _layout(fig)
 

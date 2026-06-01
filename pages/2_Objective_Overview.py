@@ -103,7 +103,11 @@ with cols[2]: kpi_card("Cost per Enrollment Form", money(enrollment["cost_per_en
 with cols[3]: kpi_card("Enrollment Priority CPA", money(enrollment["priority_cpa"]), help_text=PRIORITY_CONVERSIONS_HELP)
 if enrollment["enrollment_apply_now_clicks"] > 0 and enrollment["enrollment_forms"] == 0:
     st.warning("Apply Now intent is not translating into form submissions.")
-st.plotly_chart(objective_funnel_bar(campaign, "Enrollment", "Enrollment: Apply Now clicks vs forms by campaign"), use_container_width=True)
+enrollment_fig = objective_funnel_bar(campaign, "Enrollment", "Enrollment: Apply Now clicks vs forms by campaign")
+if enrollment_fig.data:
+    st.plotly_chart(enrollment_fig, use_container_width=True)
+else:
+    st.info("Enrollment funnel chart is unavailable because Apply Now/Form outcome columns are missing or zero for the selected filters.")
 render_table(enrollment_table, "Enrollment campaign diagnostics", "Identify campaigns with spend but no Apply Now clicks or forms, and Apply Now interest that is not becoming forms.", key="enrollment_diagnostics", display_columns=ENROLLMENT_COLUMNS)
 
 st.header("Recruitment Performance")
@@ -119,7 +123,11 @@ with cols[2]: kpi_card("Cost per Application Submitted", money(recruitment["cost
 with cols[3]: kpi_card("Recruitment Priority CPA", money(recruitment["priority_cpa"]), help_text=PRIORITY_CONVERSIONS_HELP)
 if recruitment["career_clicks"] > 0 and recruitment["applications_submitted"] == 0:
     st.warning("Career interest is not translating into submitted applications.")
-st.plotly_chart(objective_funnel_bar(campaign, "Recruitment", "Recruitment: career clicks vs applications submitted by campaign"), use_container_width=True)
+recruitment_fig = objective_funnel_bar(campaign, "Recruitment", "Recruitment: career clicks vs applications submitted by campaign")
+if recruitment_fig.data:
+    st.plotly_chart(recruitment_fig, use_container_width=True)
+else:
+    st.info("Recruitment funnel chart is unavailable because Career Click/Application outcome columns are missing or zero for the selected filters.")
 render_table(recruitment_table, "Recruitment campaign diagnostics", "Identify campaigns creating career interest without submitted applications.", key="recruitment_diagnostics", display_columns=RECRUITMENT_COLUMNS)
 
 st.header("Cross-objective diagnostics")

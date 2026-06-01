@@ -12,6 +12,7 @@ COLUMN_ALIASES = {
     "funnel_stage": "funnel_stage",
     "ad_group_name": "ad_group",
     "ad_group": "ad_group",
+    "ad_group_cleaned": "ad_group_cleaned",
     "cost": "spend",
     "amount_spent": "spend",
     "spend": "spend",
@@ -48,9 +49,25 @@ COLUMN_ALIASES = {
     "enrollment_forms": "enrollment_forms",
     "search_term": "search_term",
     "search_terms": "search_term",
+    "keyword": "keyword",
+    "search_objective_group": "search_objective_group",
+    "query_theme": "query_theme",
+    "intent_level": "intent_level",
+    "relevance": "relevance",
+    "brand_nonbrand": "brand_nonbrand",
+    "negative_keyword_candidate": "negative_keyword_candidate",
+    "keyword_expansion_candidate": "keyword_expansion_candidate",
+    "review_priority_score": "review_priority_score",
+    "action_flag": "action_flag",
     "final_url": "final_url",
     "landing_page": "final_url",
     "landing_page_url": "final_url",
+    "normalized_url": "normalized_url",
+    "page_type": "page_type",
+    "offer_program": "offer_program",
+    "primary_cta": "primary_cta",
+    "intent_match": "intent_match",
+    "cro_priority": "cro_priority",
     "date": "date",
     "day": "date",
     "week": "week",
@@ -90,8 +107,16 @@ REQUIRED_COLUMNS = {
 OPTIONAL_COLUMNS = {
     "campaign_performance": {"date", "ad_group", "objective", "network", "device", "conversion_action", "final_url", "conversions"},
     "objective_performance": {"date", "month", "objective", "campaign"},
-    "search_terms": {"date", "ad_group", "objective", "match_type", "search_term_category"},
-    "landing_pages": {"date", "objective", "page_group"},
+    "search_terms": {
+        "date", "ad_group", "ad_group_cleaned", "objective", "keyword", "match_type",
+        "search_objective_group", "query_theme", "intent_level", "relevance", "brand_nonbrand",
+        "recommended_action", "negative_keyword_candidate", "keyword_expansion_candidate",
+        "review_priority_score", "action_flag",
+    },
+    "landing_pages": {
+        "date", "objective", "normalized_url", "all_conversions", "campaign_role", "page_type",
+        "offer_program", "funnel_stage", "primary_cta", "intent_match", "cro_priority",
+    },
 }
 
 
@@ -129,7 +154,8 @@ def coerce_types(df):
                 "priority_cpa", "micro_conversions", "other_micro_conversions", "quality_conversions", "career_clicks", "applications",
                 "applications_submitted", "enrollment_apply_now_clicks", "enrollment_apply_clicks", "enrollment_forms",
                 "primary_mapped_conversions", "micro_mapped_conversions", "cost_per_enrollment_apply_click",
-                "cost_per_enrollment_form", "cost_per_career_click", "cost_per_application_submitted"]:
+                "cost_per_enrollment_form", "cost_per_career_click", "cost_per_application_submitted",
+                "review_priority_score"]:
         if col in out.columns:
             out[col] = (
                 out[col].astype(str)
