@@ -7,6 +7,9 @@ COLUMN_ALIASES = {
     "campaign_name": "campaign",
     "campaign": "campaign",
     "campaign_id": "campaign_id",
+    "campaign_status": "campaign_status",
+    "campaign_role": "campaign_role",
+    "funnel_stage": "funnel_stage",
     "ad_group_name": "ad_group",
     "ad_group": "ad_group",
     "cost": "spend",
@@ -17,7 +20,9 @@ COLUMN_ALIASES = {
     "clicks": "clicks",
     "conv": "conversions",
     "conversions": "conversions",
-    "all_conversions": "conversions",
+    "reported_conversions": "reported_conversions",
+    "all_conversions": "all_conversions",
+    "reported_cpa": "reported_cpa",
     "conversion_action": "conversion_action",
     "conversion_action_name": "conversion_action",
     "conversion_type_name": "conversion_action",
@@ -53,6 +58,21 @@ COLUMN_ALIASES = {
     "device": "device",
     "network": "network",
     "objective": "objective",
+    "objective_raw": "objective_raw",
+    "primary_kpi": "primary_kpi",
+    "budget_group": "budget_group",
+    "active_status": "active_status",
+    "cost_apply_now_click": "cost_per_enrollment_apply_click",
+    "cost_per_apply_now_click": "cost_per_enrollment_apply_click",
+    "cost_enrollment_form": "cost_per_enrollment_form",
+    "cost_per_enrollment_form": "cost_per_enrollment_form",
+    "cost_career_click": "cost_per_career_click",
+    "cost_per_career_click": "cost_per_career_click",
+    "cost_application_submitted": "cost_per_application_submitted",
+    "cost_per_application_submitted": "cost_per_application_submitted",
+    "primary_issue": "primary_issue",
+    "recommended_action": "recommended_action",
+    "join_key": "join_key",
     "match_type": "match_type",
     "search_term_category": "search_term_category",
     "page_group": "page_group",
@@ -60,7 +80,7 @@ COLUMN_ALIASES = {
 
 
 REQUIRED_COLUMNS = {
-    "campaign_performance": {"campaign", "spend", "impressions", "clicks", "conversions"},
+    "campaign_performance": {"campaign", "spend", "impressions", "clicks"},
     "objective_performance": {"spend", "impressions", "clicks", "conversions"},
     "search_terms": {"search_term", "campaign", "spend", "impressions", "clicks", "conversions"},
     "landing_pages": {"final_url", "campaign", "spend", "impressions", "clicks", "conversions"},
@@ -68,7 +88,7 @@ REQUIRED_COLUMNS = {
 
 
 OPTIONAL_COLUMNS = {
-    "campaign_performance": {"date", "ad_group", "objective", "network", "device", "conversion_action", "final_url"},
+    "campaign_performance": {"date", "ad_group", "objective", "network", "device", "conversion_action", "final_url", "conversions"},
     "objective_performance": {"date", "month", "objective", "campaign"},
     "search_terms": {"date", "ad_group", "objective", "match_type", "search_term_category"},
     "landing_pages": {"date", "objective", "page_group"},
@@ -103,10 +123,13 @@ def coerce_types(df):
     out = df.copy()
     if "date" in out.columns:
         out["date"] = pd.to_datetime(out["date"], errors="coerce")
-    for col in ["spend", "impressions", "clicks", "conversions", "total_conversions", "priority_conversions",
+    for col in ["spend", "impressions", "clicks", "conversions", "reported_conversions", "all_conversions",
+                "ctr", "cpc", "cvr", "cpa",
+                "reported_cpa", "total_conversions", "priority_conversions",
                 "priority_cpa", "micro_conversions", "other_micro_conversions", "quality_conversions", "career_clicks", "applications",
                 "applications_submitted", "enrollment_apply_now_clicks", "enrollment_apply_clicks", "enrollment_forms",
-                "primary_mapped_conversions", "micro_mapped_conversions"]:
+                "primary_mapped_conversions", "micro_mapped_conversions", "cost_per_enrollment_apply_click",
+                "cost_per_enrollment_form", "cost_per_career_click", "cost_per_application_submitted"]:
         if col in out.columns:
             out[col] = (
                 out[col].astype(str)

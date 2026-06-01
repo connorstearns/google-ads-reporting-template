@@ -4,7 +4,7 @@ from src.google_sheets import load_workbook
 from src.transforms import combine_primary_data
 from src.filters import render_sidebar, apply_global_filters
 from src.metrics import summarize, period_delta, share_columns
-from src.formatting import PRIORITY_CONVERSIONS_HELP, money, number, percent, signed_percent, kpi_card
+from src.formatting import PRIORITY_CONVERSIONS_HELP, money, number, percent, signed_percent, kpi_card, render_data_source_debug
 from src.charts import spend_vs_conversions_bar_line, objective_mix_bar, top_n_bar
 from src.tables import render_table
 
@@ -31,7 +31,7 @@ landing = apply_global_filters(landing, filters)
 
 summary = summarize(campaign)
 if summary.empty or campaign.empty:
-    st.warning("No campaign performance data is available yet. Add a model_campaign_performance tab or another supported campaign tab.")
+    st.warning("No campaign performance data is available yet. Add a model_performance_canonical tab or another supported campaign tab.")
     st.stop()
 
 row = summary.iloc[0]
@@ -90,3 +90,6 @@ with col2:
 
 render_table(objective, "Objective split", "Spend, traffic, and efficiency by objective.", key="objective_split")
 render_table(campaign_summary.head(50), "Campaign diagnostics", "Top campaign rows sorted by spend.", key="campaign_diagnostics")
+
+with st.expander("Data Source Debug", expanded=False):
+    render_data_source_debug(campaign)

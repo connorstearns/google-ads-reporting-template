@@ -29,7 +29,7 @@ def safe_divide(numerator, denominator):
 def add_standardized_conversion_metrics(df):
     out = df.copy()
     if "conversions" not in out.columns:
-        out["conversions"] = out.get("total_conversions", 0)
+        out["conversions"] = out.get("reported_conversions", out.get("total_conversions", 0))
     if "enrollment_apply_now_clicks" not in out.columns:
         out["enrollment_apply_now_clicks"] = out.get("enrollment_apply_clicks", 0)
     if "applications_submitted" not in out.columns:
@@ -41,28 +41,37 @@ def add_standardized_conversion_metrics(df):
             out[col] = 0
         out[col] = pd.to_numeric(out[col], errors="coerce").fillna(0)
     if "total_conversions" not in out.columns:
-        out["total_conversions"] = out["conversions"]
+        out["total_conversions"] = out.get("all_conversions", out["conversions"])
     out["total_conversions"] = pd.to_numeric(out["total_conversions"], errors="coerce").fillna(0)
-    out["conversions"] = out["total_conversions"]
+    out["conversions"] = pd.to_numeric(out["conversions"], errors="coerce").fillna(0)
     known = out[STANDARD_BUCKETS[:-1]].sum(axis=1)
     inferred_micro = (out["total_conversions"] - known).clip(lower=0)
     out["other_micro_conversions"] = out["other_micro_conversions"].where(out["other_micro_conversions"] > 0, inferred_micro)
     objective = out.get("objective", pd.Series("", index=out.index)).astype(str)
-    out["priority_conversions"] = np.select(
+    priority_fallback = np.select(
         [objective.str.contains("enroll", case=False), objective.str.contains("recruit", case=False)],
         [out["enrollment_apply_now_clicks"] + out["enrollment_forms"], out["applications_submitted"]],
         default=0,
     )
-    out["priority_cpa"] = safe_divide(out.get("spend", 0), out["priority_conversions"])
-    out["cost_per_enrollment_apply_click"] = safe_divide(out.get("spend", 0), out["enrollment_apply_now_clicks"])
-    out["cost_per_enrollment_form"] = safe_divide(out.get("spend", 0), out["enrollment_forms"])
-    out["cost_per_application_submitted"] = safe_divide(out.get("spend", 0), out["applications_submitted"])
-    out["cost_per_career_click"] = safe_divide(out.get("spend", 0), out["career_clicks"])
+    out["priority_conversions"] = _fill_missing_numeric(out, "priority_conversions", priority_fallback)
+    out["priority_cpa"] = _fill_missing_numeric(out, "priority_cpa", safe_divide(out.get("spend", 0), out["priority_conversions"]))
+    out["cost_per_enrollment_apply_click"] = _fill_missing_numeric(out, "cost_per_enrollment_apply_click", safe_divide(out.get("spend", 0), out["enrollment_apply_now_clicks"]))
+    out["cost_per_enrollment_form"] = _fill_missing_numeric(out, "cost_per_enrollment_form", safe_divide(out.get("spend", 0), out["enrollment_forms"]))
+    out["cost_per_application_submitted"] = _fill_missing_numeric(out, "cost_per_application_submitted", safe_divide(out.get("spend", 0), out["applications_submitted"]))
+    out["cost_per_career_click"] = _fill_missing_numeric(out, "cost_per_career_click", safe_divide(out.get("spend", 0), out["career_clicks"]))
     # Temporary aliases for older pages and downstream workbook consumers.
-    out["micro_conversions"] = out["other_micro_conversions"]
-    out["quality_conversions"] = out["priority_conversions"]
-    out["quality_cpa"] = out["priority_cpa"]
+    out["micro_conversions"] = _fill_missing_numeric(out, "micro_conversions", out["other_micro_conversions"])
+    out["quality_conversions"] = _fill_missing_numeric(out, "quality_conversions", out["priority_conversions"])
+    out["quality_cpa"] = _fill_missing_numeric(out, "quality_cpa", out["priority_cpa"])
     return out
+
+
+def _fill_missing_numeric(df, column, fallback):
+    fallback = pd.Series(fallback, index=df.index)
+    if column not in df.columns:
+        return pd.to_numeric(fallback, errors="coerce").fillna(0)
+    existing = pd.to_numeric(df[column], errors="coerce")
+    return existing.where(existing.notna(), fallback).fillna(0)
 
 
 def classify_conversion_rows(df, mapping=None, conversion_quality=None):
@@ -141,7 +150,17 @@ def join_conversion_outcomes(media, outcome_rollup):
     for metric in STANDARD_BUCKETS:
         outcome_col = f"{metric}_outcome"
         out[metric] = out[outcome_col].fillna(0) * out["_join_weight"]
+    out["total_conversions"] = np.where(
+        out["total_conversions_outcome"].notna(),
+        out["total_conversions_outcome"] * out["_join_weight"],
+        out["total_conversions"],
+    )
     out = out.drop(columns=[f"{metric}_outcome" for metric in outcome_metrics] + ["_join_weight", "_media_join_row"])
+    out = out.drop(columns=[
+        "priority_conversions", "priority_cpa", "cost_per_enrollment_apply_click",
+        "cost_per_enrollment_form", "cost_per_application_submitted", "cost_per_career_click",
+        "micro_conversions", "quality_conversions", "quality_cpa",
+    ], errors="ignore")
     enriched = add_standardized_conversion_metrics(out)
     enriched.attrs["conversion_join_debug"] = debug
     enriched.attrs["conversion_audit"] = outcome_rollup.attrs.get("conversion_audit", [])

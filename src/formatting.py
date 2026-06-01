@@ -73,6 +73,8 @@ def metric_column_config():
         "impressions": st.column_config.NumberColumn("Impressions", format="%d"),
         "clicks": st.column_config.NumberColumn("Clicks", format="%d"),
         "conversions": st.column_config.NumberColumn("Conversions", format="%.1f"),
+        "reported_conversions": st.column_config.NumberColumn("Reported Conversions", format="%.1f"),
+        "all_conversions": st.column_config.NumberColumn("All Conversions", format="%.1f"),
         "total_conversions": st.column_config.NumberColumn("Total Conversions", format="%.1f"),
         "priority_conversions": st.column_config.NumberColumn("Priority Conversions", format="%.1f"),
         "enrollment_apply_now_clicks": st.column_config.NumberColumn("Enrollment Apply Now Clicks", format="%.1f"),
@@ -80,6 +82,7 @@ def metric_column_config():
         "career_clicks": st.column_config.NumberColumn("Career Clicks", format="%.1f"),
         "applications_submitted": st.column_config.NumberColumn("Applications Submitted", format="%.1f"),
         "other_micro_conversions": st.column_config.NumberColumn("Other / Micro Conversions", format="%.1f"),
+        "micro_conversions": st.column_config.NumberColumn("Micro Conversions", format="%.1f"),
         "priority_score": st.column_config.NumberColumn("Priority Score", format="%d"),
     }
 
@@ -92,9 +95,9 @@ def render_conversion_model_debug(campaign):
     st.write(f"Conversion outcomes tab: `{debug.get('conversion_outcomes_tab', 'Unknown')}`")
     st.write(f"Join keys: `{', '.join(debug.get('join_keys', [])) or 'No conversion outcome join'}`")
     st.write(f"Matched media rows: `{debug.get('matched_media_rows', 0)}` of `{debug.get('media_rows', len(campaign))}`")
-    totals = campaign[[
+    totals = campaign.reindex(columns=[
         "enrollment_apply_now_clicks", "enrollment_forms", "applications_submitted", "career_clicks", "priority_conversions"
-    ]].sum()
+    ], fill_value=0).sum()
     cols = st.columns(5)
     with cols[0]: st.metric("Apply Now Clicks", f"{totals['enrollment_apply_now_clicks']:,.1f}")
     with cols[1]: st.metric("Enrollment Forms", f"{totals['enrollment_forms']:,.1f}")
@@ -116,3 +119,28 @@ def render_conversion_model_debug(campaign):
         st.success("No unmapped conversion actions are present.")
     else:
         st.dataframe(unmapped, use_container_width=True, hide_index=True)
+
+
+def render_data_source_debug(campaign):
+    debug = campaign.attrs.get("conversion_join_debug", {})
+    totals = campaign.reindex(columns=[
+        "spend", "reported_conversions", "all_conversions", "priority_conversions",
+        "enrollment_apply_now_clicks", "enrollment_forms", "career_clicks",
+        "applications_submitted", "micro_conversions",
+    ], fill_value=0).sum(numeric_only=True)
+    st.write(f"Campaign performance tab: `{debug.get('campaign_media_tab', 'Unknown')}`")
+    st.write(f"Canonical fields found: `{debug.get('canonical_fields_found', False)}`")
+    labels = {
+        "spend": "Total Spend",
+        "reported_conversions": "Total Reported Conversions",
+        "all_conversions": "Total All Conversions",
+        "priority_conversions": "Total Priority Conversions",
+        "enrollment_apply_now_clicks": "Total Enrollment Apply Now Clicks",
+        "enrollment_forms": "Total Enrollment Forms",
+        "career_clicks": "Total Career Clicks",
+        "applications_submitted": "Total Applications Submitted",
+        "micro_conversions": "Total Micro Conversions",
+    }
+    for metric, label in labels.items():
+        value = totals.get(metric, 0)
+        st.write(f"{label}: `{value:,.2f}`")

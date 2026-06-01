@@ -59,11 +59,12 @@ Grant Viewer access unless the app is later extended to write back to the sheet.
 
 The app resolves logical datasets to the first available preferred or alias tab. It prefers `model_` and `report_` tabs before raw fallbacks.
 
-- `campaign_performance`: `model_campaign_daily`, `report_monthly_campaigns`, `model_campaign_performance`, `raw_campaign_daily`
+- `campaign_performance`: `model_performance_canonical`, `model_campaign_daily`, `report_monthly_campaigns`, `model_campaign_performance`, `raw_campaign_daily`
 - `objective_performance`: `report_monthly_objective`, `model_campaign_daily`, `model_objective_performance`
 - `search_terms`: `model_search_terms`, `report_search_terms`, `raw_search_terms`
 - `landing_pages`: `model_landing_pages`, `report_landing_pages`, `raw_landing_pages`
 - `conversion_quality`: `model_conversion_quality`, `report_monthly_conversions`, `raw_conversion_actions`
+- `conversion_rollup` optional: `model_conversion_rollup`
 - `review_queue`: `report_review_queue`, `model_review_queue`
 - `campaign_mapping`: `map_campaigns`, `campaign_mapping`
 - `landing_page_mapping`: `map_landing_pages`, `landing_page_mapping`
@@ -159,9 +160,13 @@ The app reads data only through `src/google_sheets.py::load_workbook()`. That fu
 
 ## Analytics Logic
 
-The dashboard emphasizes HCZ priority outcomes over raw conversion volume. Enrollment priority conversions are Apply Now clicks plus Enrollment Forms. Recruitment priority conversions are Applications Submitted. Career Clicks remain visible as a mid-funnel recruitment intent metric but do not count as priority conversions. Conversion classification is centralized in `src/conversion_logic.py`: it prefers `map_conversion_actions`, then `model_conversion_quality`, and only uses cautious keyword inference when mapping data is unavailable.
+The dashboard emphasizes HCZ priority outcomes over raw conversion volume. Enrollment priority conversions are Apply Now clicks plus Enrollment Forms. Recruitment priority conversions are Applications Submitted. Career Clicks remain visible as a mid-funnel recruitment intent metric but do not count as priority conversions.
 
-Campaign media and conversion outcomes are modeled separately. `model_campaign_daily` supplies spend, impressions, and clicks. `model_conversion_quality` or its fallback supplies conversion-action detail. The app builds a standardized outcome rollup and joins it to campaign media using the strongest shared grain available: campaign ID plus date, campaign plus date, campaign ID plus month, campaign plus month, then campaign only as a last resort. When multiple media rows share a join grain, outcome counts are allocated across those rows so campaign totals are not duplicated.
+## Canonical Sheet Model
+
+`model_conversion_rollup` aggregates conversion-action detail from `model_conversion_quality`. `model_performance_canonical` joins campaign media delivery to priority outcome metrics and is the preferred campaign performance input for the Streamlit app. The app trusts its canonical outcome columns, including Priority Conversions and Priority CPA.
+
+Python conversion inference remains available only as fallback logic for older campaign datasets that do not include the canonical outcome columns. In that fallback path, `model_campaign_daily` supplies spend, impressions, and clicks, while `model_conversion_quality` or its fallback supplies conversion-action detail. The app builds a standardized outcome rollup and joins it to campaign media using the strongest shared grain available: campaign ID plus date, campaign plus date, campaign ID plus month, campaign plus month, then campaign only as a last resort. When multiple media rows share a join grain, outcome counts are allocated across those rows so campaign totals are not duplicated.
 
 The review queue uses configurable thresholds for spend, Priority CPA, CTR, CPC, minimum clicks, and minimum priority conversions. It prioritizes actionable issues such as high spend with no priority conversions, unmapped entities, inefficient Priority CPA, and low CTR.
 

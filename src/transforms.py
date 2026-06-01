@@ -9,6 +9,15 @@ from .conversion_logic import (
 from .metrics import add_core_metrics
 
 
+CANONICAL_CAMPAIGN_FIELDS = {
+    "priority_conversions",
+    "enrollment_apply_now_clicks",
+    "enrollment_forms",
+    "career_clicks",
+    "applications_submitted",
+}
+
+
 def normalize_objective(value):
     text = str(value or "").strip().lower()
     if "enroll" in text:
@@ -63,8 +72,11 @@ def combine_primary_data(data):
     conversion_mapping = data.get("conversion_action_mapping", data.get("conversion_mapping", pd.DataFrame()))
     conversion_quality = data.get("conversion_quality", pd.DataFrame())
     objective_df = data.get("objective_performance", data.get("objective", pd.DataFrame()))
+    canonical_fields_found = CANONICAL_CAMPAIGN_FIELDS.issubset(campaign_df.columns)
     campaign_media = prepare_performance(campaign_df)
-    if not conversion_quality.empty:
+    if canonical_fields_found:
+        campaign = campaign_media
+    elif not conversion_quality.empty:
         conversion_rollup = build_conversion_outcome_rollup(conversion_quality, conversion_mapping)
         campaign = join_conversion_outcomes(campaign_media, conversion_rollup)
     else:
@@ -75,6 +87,7 @@ def combine_primary_data(data):
     metadata = data.get("_metadata", {})
     debug["campaign_media_tab"] = metadata.get("tab_aliases", {}).get("campaign_performance", "campaign_performance")
     debug["conversion_outcomes_tab"] = metadata.get("tab_aliases", {}).get("conversion_quality", "conversion_quality")
+    debug["canonical_fields_found"] = canonical_fields_found
     debug["business_rule_issues"] = validate_priority_business_rules(campaign)
     campaign.attrs["conversion_join_debug"] = debug
     search = prepare_performance(apply_conversion_mapping(data.get("search_terms", data.get("search", pd.DataFrame())), conversion_mapping, conversion_quality))

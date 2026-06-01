@@ -2,11 +2,12 @@ SPREADSHEET_ID = "18RXavpYmmXc2zSVz1xxCXbGub-VvBU-NzHjv_FB6d6o"
 SPREADSHEET_URL = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/edit"
 
 EXPECTED_MODEL_TABS = {
-    "campaign_performance": "model_campaign_daily",
+    "campaign_performance": "model_performance_canonical",
     "objective_performance": "report_monthly_objective",
     "search_terms": "model_search_terms",
     "landing_pages": "model_landing_pages",
     "conversion_quality": "model_conversion_quality",
+    "conversion_rollup": "model_conversion_rollup",
     "review_queue": "report_review_queue",
     "campaign_mapping": "map_campaigns",
     "landing_page_mapping": "map_landing_pages",
@@ -17,8 +18,11 @@ EXPECTED_MODEL_TABS = {
     "dashboard_validation": "qa_dashboard_validation",
 }
 
+OPTIONAL_MODEL_TABS = {"conversion_rollup"}
+
 TAB_ALIASES = {
     "campaign_performance": [
+        "model_performance_canonical",
         "model_campaign_daily",
         "report_monthly_campaigns",
         "model_campaign_performance",
@@ -44,6 +48,7 @@ TAB_ALIASES = {
         "report_monthly_conversions",
         "raw_conversion_actions",
     ],
+    "conversion_rollup": ["model_conversion_rollup"],
     "review_queue": [
         "report_review_queue",
         "model_review_queue",

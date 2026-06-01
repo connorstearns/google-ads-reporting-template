@@ -5,7 +5,7 @@ from gspread.exceptions import APIError, GSpreadException, SpreadsheetNotFound
 from google.oauth2.service_account import Credentials
 from google.auth.exceptions import GoogleAuthError
 
-from .config import EXPECTED_MODEL_TABS, SPREADSHEET_ID, TAB_ALIASES
+from .config import EXPECTED_MODEL_TABS, OPTIONAL_MODEL_TABS, SPREADSHEET_ID, TAB_ALIASES
 from .data_validation import ValidationResult, normalize_columns, coerce_types, validate_dataframe
 
 
@@ -59,6 +59,8 @@ def _worksheet_to_dataframe(worksheet):
 
 def _missing_tab_result(tab_key):
     expected = EXPECTED_MODEL_TABS.get(tab_key, tab_key)
+    if tab_key in OPTIONAL_MODEL_TABS:
+        return ValidationResult(tab_key, expected, "yellow", [], [], f"{tab_key} is optional and was not found.")
     return ValidationResult(tab_key, expected, "red", [], [], f"{tab_key} missing; no configured preferred or alias tab was found.")
 
 

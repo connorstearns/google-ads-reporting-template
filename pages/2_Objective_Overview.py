@@ -9,7 +9,7 @@ from src.charts import (
 )
 from src.conversion_logic import conversion_debug_audit, objective_diagnostic_flags, recommended_objective_action
 from src.filters import apply_global_filters, render_sidebar
-from src.formatting import PRIORITY_CONVERSIONS_HELP, apply_page_style, kpi_card, money, number, render_conversion_model_debug
+from src.formatting import PRIORITY_CONVERSIONS_HELP, apply_page_style, kpi_card, money, number, render_conversion_model_debug, render_data_source_debug
 from src.google_sheets import load_workbook
 from src.metrics import summarize
 from src.tables import render_table
@@ -50,8 +50,16 @@ def campaign_diagnostics(campaign, objective):
             .rename("conversion_mapping_status")
         )
         perf = perf.merge(unmapped, on="campaign", how="left")
-    perf["primary_issue"] = perf.apply(objective_diagnostic_flags, axis=1)
-    perf["recommended_action"] = perf.apply(recommended_objective_action, axis=1)
+    local_issues = perf.apply(objective_diagnostic_flags, axis=1)
+    local_actions = perf.apply(recommended_objective_action, axis=1)
+    if "primary_issue" not in perf.columns:
+        perf["primary_issue"] = local_issues
+    else:
+        perf["primary_issue"] = perf["primary_issue"].fillna("").where(perf["primary_issue"].fillna("").ne(""), local_issues)
+    if "recommended_action" not in perf.columns:
+        perf["recommended_action"] = local_actions
+    else:
+        perf["recommended_action"] = perf["recommended_action"].fillna("").where(perf["recommended_action"].fillna("").ne(""), local_actions)
     return perf.sort_values(["priority_conversions", "spend"], ascending=[True, False])
 
 
@@ -93,6 +101,8 @@ with cols[0]: kpi_card("Enrollment Priority Conversions", number(enrollment["pri
 with cols[1]: kpi_card("Cost per Apply Now Click", money(enrollment["cost_per_enrollment_apply_click"]))
 with cols[2]: kpi_card("Cost per Enrollment Form", money(enrollment["cost_per_enrollment_form"]))
 with cols[3]: kpi_card("Enrollment Priority CPA", money(enrollment["priority_cpa"]), help_text=PRIORITY_CONVERSIONS_HELP)
+if enrollment["enrollment_apply_now_clicks"] > 0 and enrollment["enrollment_forms"] == 0:
+    st.warning("Apply Now intent is not translating into form submissions.")
 st.plotly_chart(objective_funnel_bar(campaign, "Enrollment", "Enrollment: Apply Now clicks vs forms by campaign"), use_container_width=True)
 render_table(enrollment_table, "Enrollment campaign diagnostics", "Identify campaigns with spend but no Apply Now clicks or forms, and Apply Now interest that is not becoming forms.", key="enrollment_diagnostics", display_columns=ENROLLMENT_COLUMNS)
 
@@ -107,6 +117,8 @@ with cols[0]: kpi_card("Recruitment Priority Conversions", number(recruitment["p
 with cols[1]: kpi_card("Cost per Career Click", money(recruitment["cost_per_career_click"]))
 with cols[2]: kpi_card("Cost per Application Submitted", money(recruitment["cost_per_application_submitted"]))
 with cols[3]: kpi_card("Recruitment Priority CPA", money(recruitment["priority_cpa"]), help_text=PRIORITY_CONVERSIONS_HELP)
+if recruitment["career_clicks"] > 0 and recruitment["applications_submitted"] == 0:
+    st.warning("Career interest is not translating into submitted applications.")
 st.plotly_chart(objective_funnel_bar(campaign, "Recruitment", "Recruitment: career clicks vs applications submitted by campaign"), use_container_width=True)
 render_table(recruitment_table, "Recruitment campaign diagnostics", "Identify campaigns creating career interest without submitted applications.", key="recruitment_diagnostics", display_columns=RECRUITMENT_COLUMNS)
 
@@ -129,3 +141,6 @@ with st.expander("Debug conversion classification", expanded=False):
         st.info("Conversion-action detail is not available in the conversion outcome dataset.")
     else:
         st.dataframe(audit, use_container_width=True, hide_index=True)
+
+with st.expander("Data Source Debug", expanded=False):
+    render_data_source_debug(campaign)

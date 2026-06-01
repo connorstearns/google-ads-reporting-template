@@ -9,7 +9,7 @@ from src.charts import (
     campaign_status_spend_bar,
 )
 from src.filters import apply_global_filters, render_sidebar
-from src.formatting import PRIORITY_CONVERSIONS_HELP, apply_page_style, kpi_card, money, number, render_conversion_model_debug
+from src.formatting import PRIORITY_CONVERSIONS_HELP, apply_page_style, kpi_card, money, number, render_conversion_model_debug, render_data_source_debug
 from src.google_sheets import load_workbook
 from src.metrics import summarize
 from src.tables import render_table
@@ -21,11 +21,10 @@ ACTION_COLUMNS = [
     "priority_cpa", "primary_issue", "recommended_action", "rationale",
 ]
 DECISION_COLUMNS = [
-    "status", "objective", "campaign", "ad_group", "spend", "spend_share", "impressions",
-    "clicks", "ctr", "cpc", "total_conversions", "priority_conversions", "priority_cpa",
-    "enrollment_apply_now_clicks", "enrollment_forms", "applications_submitted", "career_clicks",
-    "other_micro_conversions", "cvr", "cpa",
-    "primary_issue", "recommended_action",
+    "objective", "campaign", "campaign_role", "funnel_stage", "spend", "clicks",
+    "reported_conversions", "all_conversions", "priority_conversions", "priority_cpa",
+    "enrollment_apply_now_clicks", "enrollment_forms", "career_clicks", "applications_submitted",
+    "micro_conversions", "primary_issue", "recommended_action", "status",
 ]
 
 
@@ -131,3 +130,6 @@ with st.expander("Supporting campaign views", expanded=False):
 
 with st.expander("Debug conversion outcome join", expanded=False):
     render_conversion_model_debug(campaign)
+
+with st.expander("Data Source Debug", expanded=False):
+    render_data_source_debug(campaign)

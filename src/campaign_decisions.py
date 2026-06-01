@@ -1,4 +1,5 @@
 from .metrics import safe_divide, share_columns, summarize
+from .config import DEFAULT_THRESHOLDS
 
 
 OPTIONAL_CAMPAIGN_FIELDS = [
@@ -62,9 +63,18 @@ def build_campaign_decisions(df, thresholds, include_ad_group=True):
     out = ensure_campaign_fields(out)
     out = share_columns(out)
     out["priority_conversion_rate"] = safe_divide(out["priority_conversions"], out["total_conversions"])
-    out["primary_issue"] = out.apply(lambda row: diagnose_campaign(row, thresholds), axis=1)
+    sheet_guidance = thresholds == DEFAULT_THRESHOLDS
+    local_issues = out.apply(lambda row: diagnose_campaign(row, thresholds), axis=1)
+    if not sheet_guidance or "primary_issue" not in out.columns:
+        out["primary_issue"] = local_issues
+    else:
+        out["primary_issue"] = out["primary_issue"].fillna("").where(out["primary_issue"].fillna("").ne(""), local_issues)
     out["status"] = out.apply(lambda row: classify_campaign(row, thresholds), axis=1)
-    out["recommended_action"] = out.apply(recommend_action, axis=1)
+    local_actions = out.apply(recommend_action, axis=1)
+    if not sheet_guidance or "recommended_action" not in out.columns:
+        out["recommended_action"] = local_actions
+    else:
+        out["recommended_action"] = out["recommended_action"].fillna("").where(out["recommended_action"].fillna("").ne(""), local_actions)
     out["rationale"] = out.apply(lambda row: build_rationale(row, thresholds), axis=1)
     out["priority_score"] = out.apply(lambda row: priority_score(row, thresholds), axis=1)
     out["_status_order"] = out["status"].map(STATUS_ORDER).fillna(99)

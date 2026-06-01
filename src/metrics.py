@@ -12,23 +12,35 @@ def add_core_metrics(df):
     out = df.copy()
     for col in ["spend", "impressions", "clicks", "conversions"]:
         if col not in out.columns:
-            out[col] = 0
+            out[col] = out.get("reported_conversions", out.get("total_conversions", 0)) if col == "conversions" else 0
     out = add_standardized_conversion_metrics(out)
-    out["ctr"] = safe_divide(out["clicks"], out["impressions"])
-    out["cpc"] = safe_divide(out["spend"], out["clicks"])
-    out["cvr"] = safe_divide(out["total_conversions"], out["clicks"])
-    out["cpa"] = safe_divide(out["spend"], out["total_conversions"])
+    out["ctr"] = _fill_missing_metric(out, "ctr", safe_divide(out["clicks"], out["impressions"]))
+    out["cpc"] = _fill_missing_metric(out, "cpc", safe_divide(out["spend"], out["clicks"]))
+    out["cvr"] = _fill_missing_metric(out, "cvr", safe_divide(out["total_conversions"], out["clicks"]))
+    out["cpa"] = _fill_missing_metric(out, "cpa", safe_divide(out["spend"], out["total_conversions"]))
     return out
+
+
+def _fill_missing_metric(df, column, fallback):
+    fallback = pd.Series(fallback, index=df.index)
+    if column not in df.columns:
+        return fallback
+    existing = pd.to_numeric(df[column], errors="coerce")
+    return existing.where(existing.notna(), fallback).fillna(0)
 
 
 def summarize(df, group_cols=None):
     if df.empty:
         return add_core_metrics(pd.DataFrame())
     group_cols = group_cols or []
-    numeric = ["spend", "impressions", "clicks", "conversions", "total_conversions", "priority_conversions",
+    numeric = ["spend", "impressions", "clicks", "conversions", "reported_conversions", "all_conversions",
+               "total_conversions", "priority_conversions",
                "other_micro_conversions", "micro_conversions", "quality_conversions", "career_clicks", "applications_submitted",
                "applications", "enrollment_apply_clicks", "enrollment_apply_now_clicks", "enrollment_forms"]
     agg = {c: "sum" for c in numeric if c in df.columns}
+    for col in ["campaign_role", "funnel_stage", "primary_issue", "recommended_action"]:
+        if col in df.columns and col not in group_cols:
+            agg[col] = lambda values: values.iloc[0] if not values.empty else ""
     if group_cols:
         out = df.groupby(group_cols, dropna=False, as_index=False).agg(agg)
     else:
