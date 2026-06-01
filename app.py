@@ -4,7 +4,7 @@ from src.google_sheets import load_workbook
 from src.transforms import combine_primary_data
 from src.filters import render_sidebar, apply_global_filters
 from src.metrics import summarize, period_delta, share_columns
-from src.formatting import money, number, percent, signed_percent, kpi_card
+from src.formatting import PRIORITY_CONVERSIONS_HELP, money, number, percent, signed_percent, kpi_card
 from src.charts import spend_vs_conversions_bar_line, objective_mix_bar, top_n_bar
 from src.tables import render_table
 
@@ -13,7 +13,7 @@ st.set_page_config(page_title="HCZ Google Ads Dashboard", layout="wide")
 apply_page_style()
 
 st.title("HCZ Google Ads Executive Summary")
-st.caption("Internal reporting dashboard for spend, traffic, conversion quality, and optimization priorities.")
+st.caption("Internal reporting dashboard for spend, traffic, priority outcomes, and optimization priorities.")
 
 try:
     data, validation, _ = load_workbook()
@@ -47,10 +47,10 @@ with cols[2]: kpi_card("Clicks", number(row.clicks), signed_percent(deltas.get("
 with cols[3]: kpi_card("CTR", percent(row.ctr), signed_percent(deltas.get("ctr")))
 with cols[4]: kpi_card("CPC", money(row.cpc, 2), None)
 cols = st.columns(4)
-with cols[0]: kpi_card("Conversions", number(row.conversions, 1), signed_percent(deltas.get("conversions")))
+with cols[0]: kpi_card("Total conversions", number(row.total_conversions, 1), signed_percent(deltas.get("conversions")))
 with cols[1]: kpi_card("CPA", money(row.cpa), signed_percent(deltas.get("cpa")))
-with cols[2]: kpi_card("Quality conversions", number(row.quality_conversions, 1), None)
-with cols[3]: kpi_card("Quality CPA", money(row.quality_cpa), None)
+with cols[2]: kpi_card("Priority conversions", number(row.priority_conversions, 1), None, PRIORITY_CONVERSIONS_HELP)
+with cols[3]: kpi_card("Priority CPA", money(row.priority_cpa), None, PRIORITY_CONVERSIONS_HELP)
 
 st.plotly_chart(spend_vs_conversions_bar_line(campaign), use_container_width=True)
 
@@ -58,7 +58,7 @@ left, right = st.columns(2)
 with left:
     st.plotly_chart(objective_mix_bar(campaign, "spend", "Spend by objective"), use_container_width=True)
 with right:
-    st.plotly_chart(objective_mix_bar(campaign, "conversions", "Conversions by objective"), use_container_width=True)
+    st.plotly_chart(objective_mix_bar(campaign, "priority_conversions", "Priority conversions by objective"), use_container_width=True)
 
 objective = share_columns(summarize(campaign, ["objective"])).sort_values("spend", ascending=False)
 campaign_summary = summarize(campaign, ["objective", "campaign"]).sort_values("spend", ascending=False)
@@ -71,10 +71,10 @@ if not campaign_summary.empty:
     notes.append(f"Spend is concentrated in {top.campaign}, which accounts for {percent(spend_share)} of filtered spend.")
 if "Enrollment" in objective.get("objective", []).values:
     enroll = objective[objective.objective.eq("Enrollment")].iloc[0]
-    notes.append(f"Enrollment accounts for {percent(enroll.conversion_share)} of conversions.")
-zero_quality = campaign_summary[(campaign_summary.spend > 0) & (campaign_summary.quality_conversions == 0)]
-if not zero_quality.empty:
-    notes.append(f"{len(zero_quality)} campaigns have spend but no quality conversions.")
+    notes.append(f"Enrollment accounts for {percent(enroll.priority_conversions_share)} of priority conversions.")
+zero_priority = campaign_summary[(campaign_summary.spend > 0) & (campaign_summary.priority_conversions == 0)]
+if not zero_priority.empty:
+    notes.append(f"{len(zero_priority)} campaigns have spend but no priority conversions.")
 if not search.empty and "objective" in search.columns:
     unmapped_spend = search.loc[search.objective.eq("Other / Unmapped"), "spend"].sum()
     total_spend = search["spend"].sum()
@@ -86,7 +86,7 @@ col1, col2 = st.columns(2)
 with col1:
     st.plotly_chart(top_n_bar(campaign, "campaign", "spend", 10, "Top campaigns by spend"), use_container_width=True)
 with col2:
-    st.plotly_chart(top_n_bar(campaign, "campaign", "quality_conversions", 10, "Top campaigns by quality conversions"), use_container_width=True)
+    st.plotly_chart(top_n_bar(campaign, "campaign", "priority_conversions", 10, "Top campaigns by priority conversions"), use_container_width=True)
 
 render_table(objective, "Objective split", "Spend, traffic, and efficiency by objective.", key="objective_split")
 render_table(campaign_summary.head(50), "Campaign diagnostics", "Top campaign rows sorted by spend.", key="campaign_diagnostics")

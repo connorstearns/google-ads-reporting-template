@@ -81,11 +81,11 @@ OBJECTIVE_COLORS = {
 DEFAULT_THRESHOLDS = {
     "min_spend": 250.0,
     "cpa": 250.0,
-    "quality_cpa": 350.0,
+    "priority_cpa": 350.0,
     "ctr": 0.01,
     "cpc": 8.0,
     "min_clicks": 20,
-    "min_quality_conversions": 3,
+    "min_priority_conversions": 3,
 }
 
 QUALITY_CONVERSION_TYPES = {

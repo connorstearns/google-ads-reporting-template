@@ -159,9 +159,9 @@ The app reads data only through `src/google_sheets.py::load_workbook()`. That fu
 
 ## Analytics Logic
 
-The dashboard emphasizes quality outcomes over raw conversion volume. If `conversion_action_mapping` is available, conversion actions are classified into enrollment lead, enrollment intent, recruitment lead, recruitment intent, soft engagement, and unmapped categories. If no mapping exists, the app uses cautious keyword inference and exposes inferred mapping status where possible.
+The dashboard emphasizes HCZ priority outcomes over raw conversion volume. Enrollment priority conversions are Apply Now clicks plus Enrollment Forms. Recruitment priority conversions are Applications Submitted. Career Clicks remain visible as a mid-funnel recruitment intent metric but do not count as priority conversions. If no conversion mapping exists, the app uses cautious keyword inference and exposes inferred mapping status where possible.
 
-The review queue uses configurable thresholds for spend, CPA, CTR, CPC, and minimum clicks. It prioritizes actionable issues such as high spend with no conversions, no quality conversions, unmapped entities, inefficient CPA, and low CTR.
+The review queue uses configurable thresholds for spend, Priority CPA, CTR, CPC, minimum clicks, and minimum priority conversions. It prioritizes actionable issues such as high spend with no priority conversions, unmapped entities, inefficient Priority CPA, and low CTR.
 
 ## Adding New Model Tabs
 

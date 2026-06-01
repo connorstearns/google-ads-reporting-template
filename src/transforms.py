@@ -1,6 +1,5 @@
 import re
 import pandas as pd
-from .config import QUALITY_CONVERSION_TYPES
 from .metrics import add_core_metrics
 
 
@@ -51,8 +50,24 @@ def apply_conversion_mapping(df, mapping):
         out["conversion_mapping_status"] = out["conversion_type"].where(out["conversion_type"].eq("Other / Unmapped"), "Mapped")
     elif "conversion_action" in out.columns:
         out["conversion_type"] = out["conversion_action"].apply(infer_conversion_type)
-    out["quality_conversions"] = out["conversions"].where(out["conversion_type"].isin(QUALITY_CONVERSION_TYPES), 0)
+    buckets = out.apply(lambda row: infer_standard_conversion_metric(row.get("conversion_action"), row.get("conversion_type")), axis=1)
+    for metric in ["enrollment_apply_now_clicks", "enrollment_forms", "applications_submitted", "career_clicks", "micro_conversions"]:
+        out[metric] = out["conversions"].where(buckets.eq(metric), 0)
+    out["total_conversions"] = out["conversions"]
     return out
+
+
+def infer_standard_conversion_metric(action, conversion_type=""):
+    text = f"{action or ''} {conversion_type or ''}".lower()
+    if re.search(r"application.{0,12}(submit|complete)|submit.{0,12}application|recruitment lead", text):
+        return "applications_submitted"
+    if re.search(r"career|job|teacher|recruit", text) and re.search(r"click|opportunit|intent", text):
+        return "career_clicks"
+    if re.search(r"enroll|scholar|lottery|kindergarten|k-8|promise academy", text) and re.search(r"form|lead", text):
+        return "enrollment_forms"
+    if re.search(r"apply now|apply_now|enrollment intent", text):
+        return "enrollment_apply_now_clicks"
+    return "micro_conversions"
 
 
 def infer_conversion_type(value):

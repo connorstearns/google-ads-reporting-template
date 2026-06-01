@@ -2,12 +2,13 @@ from .metrics import safe_divide, share_columns, summarize
 
 
 OPTIONAL_CAMPAIGN_FIELDS = [
-    "quality_conversions",
-    "quality_cpa",
-    "enrollment_apply_clicks",
+    "priority_conversions",
+    "priority_cpa",
+    "enrollment_apply_now_clicks",
     "enrollment_forms",
     "career_clicks",
-    "applications",
+    "applications_submitted",
+    "micro_conversions",
     "objective",
     "ad_group",
 ]
@@ -26,7 +27,7 @@ def missing_optional_campaign_fields(source_df):
     columns = set(source_df.columns)
     missing = []
     for col in OPTIONAL_CAMPAIGN_FIELDS:
-        if col == "enrollment_apply_clicks" and "enrollment_apply_now_clicks" in columns:
+        if col == "enrollment_apply_now_clicks" and "enrollment_apply_clicks" in columns:
             continue
         if col not in columns:
             missing.append(col)
@@ -40,9 +41,11 @@ def ensure_campaign_fields(df):
     out["objective"] = out["objective"].fillna("Other / Unmapped").replace("", "Other / Unmapped")
     if "campaign" not in out.columns:
         out["campaign"] = "Unknown campaign"
-    if "enrollment_apply_clicks" not in out.columns:
-        out["enrollment_apply_clicks"] = out.get("enrollment_apply_now_clicks", 0)
-    for col in ["quality_conversions", "enrollment_forms", "career_clicks", "applications"]:
+    if "enrollment_apply_now_clicks" not in out.columns:
+        out["enrollment_apply_now_clicks"] = out.get("enrollment_apply_clicks", 0)
+    if "applications_submitted" not in out.columns:
+        out["applications_submitted"] = out.get("applications", 0)
+    for col in ["priority_conversions", "enrollment_forms", "career_clicks", "applications_submitted", "micro_conversions"]:
         if col not in out.columns:
             out[col] = 0
     return out
@@ -56,7 +59,7 @@ def build_campaign_decisions(df, thresholds, include_ad_group=True):
     out = summarize(prepared, group_cols)
     out = ensure_campaign_fields(out)
     out = share_columns(out)
-    out["quality_conversion_rate"] = safe_divide(out["quality_conversions"], out["conversions"])
+    out["priority_conversion_rate"] = safe_divide(out["priority_conversions"], out["total_conversions"])
     out["primary_issue"] = out.apply(lambda row: diagnose_campaign(row, thresholds), axis=1)
     out["status"] = out.apply(lambda row: classify_campaign(row, thresholds), axis=1)
     out["recommended_action"] = out.apply(recommend_action, axis=1)
@@ -69,16 +72,16 @@ def build_campaign_decisions(df, thresholds, include_ad_group=True):
 def diagnose_campaign(row, thresholds):
     spend = row["spend"]
     clicks = row["clicks"]
-    conversions = row["conversions"]
-    quality_conversions = row["quality_conversions"]
+    conversions = row["total_conversions"]
+    priority_conversions = row["priority_conversions"]
     if row["objective"] in {"Other", "Other / Unmapped", "", None}:
         return "Mapping gap"
     if _has_objective_mismatch(row):
         return "Objective mismatch"
     if spend >= thresholds["min_spend"] and conversions == 0:
         return "Spend with no conversions"
-    if spend >= thresholds["min_spend"] and quality_conversions == 0:
-        return "Spend with no quality conversions"
+    if spend >= thresholds["min_spend"] and priority_conversions == 0:
+        return "Spend with no priority conversions"
     if spend < thresholds["min_spend"] or clicks < thresholds["min_clicks"]:
         return "Insufficient data"
     if row["ctr"] < thresholds["ctr"]:
@@ -87,8 +90,8 @@ def diagnose_campaign(row, thresholds):
         return "High CPC"
     if row["cvr"] < 0.03:
         return "Low CVR"
-    if conversions > 0 and row["quality_conversion_rate"] < 0.25:
-        return "Low quality conversion rate"
+    if conversions > 0 and row["priority_conversion_rate"] < 0.25:
+        return "Low priority conversion rate"
     return "No major issue"
 
 
@@ -96,21 +99,23 @@ def classify_campaign(row, thresholds):
     meaningful = row["spend"] >= thresholds["min_spend"] and row["clicks"] >= thresholds["min_clicks"]
     if row["objective"] in {"Other", "Other / Unmapped", "", None}:
         return "Mapping Needed"
-    if meaningful and (row["quality_conversions"] == 0 or row["primary_issue"] == "Objective mismatch"):
+    if row["spend"] >= thresholds["min_spend"] and row["priority_conversions"] == 0:
+        return "Investigate"
+    if meaningful and row["primary_issue"] == "Objective mismatch":
         return "Investigate"
     if not meaningful:
         return "Monitor"
     if (
-        row["quality_conversions"] > 0
-        and row["quality_cpa"] > thresholds["quality_cpa"]
+        row["priority_conversions"] > 0
+        and row["priority_cpa"] > thresholds["priority_cpa"]
     ) or (
-        row["conversions"] > 0
-        and row["cpa"] > thresholds["cpa"]
+        row["total_conversions"] > 0
+        and row["priority_conversion_rate"] < 0.25
     ):
         return "Optimize"
     if (
-        row["quality_conversions"] >= thresholds["min_quality_conversions"]
-        and 0 < row["quality_cpa"] <= thresholds["quality_cpa"]
+        row["priority_conversions"] >= thresholds["min_priority_conversions"]
+        and 0 < row["priority_cpa"] <= thresholds["priority_cpa"]
     ):
         return "Scale"
     return "Maintain"
@@ -124,8 +129,8 @@ def recommend_action(row):
         return "Check conversion action quality"
     if issue == "Spend with no conversions":
         return "Reduce budget or pause if no signal"
-    if issue in {"Spend with no quality conversions", "Low quality conversion rate"}:
-        return "Check conversion action quality"
+    if issue in {"Spend with no priority conversions", "Low priority conversion rate"}:
+        return "Check priority conversion path"
     if row["status"] == "Scale":
         return "Consider scaling gradually"
     if issue == "Low CTR":
@@ -145,12 +150,12 @@ def build_rationale(row, thresholds):
     if row["status"] == "Monitor":
         return f"Only ${row['spend']:,.0f} spend and {row['clicks']:,.0f} clicks; wait for a stronger signal."
     if row["status"] == "Investigate":
-        return f"${row['spend']:,.0f} spend has produced {row['quality_conversions']:,.1f} quality conversions. Primary issue: {row['primary_issue']}."
+        return f"${row['spend']:,.0f} spend has produced {row['priority_conversions']:,.1f} priority conversions. Primary issue: {row['primary_issue']}."
     if row["status"] == "Optimize":
-        return f"Efficiency needs work: CPA ${row['cpa']:,.0f}, quality CPA ${row['quality_cpa']:,.0f}. Primary issue: {row['primary_issue']}."
+        return f"Efficiency needs work: CPA ${row['cpa']:,.0f}, priority CPA ${row['priority_cpa']:,.0f}. Primary issue: {row['primary_issue']}."
     if row["status"] == "Scale":
-        return f"{row['quality_conversions']:,.1f} quality conversions at ${row['quality_cpa']:,.0f} quality CPA, below the ${thresholds['quality_cpa']:,.0f} threshold."
-    return f"Performance is acceptable at ${row['quality_cpa']:,.0f} quality CPA, without enough quality volume to qualify for scaling."
+        return f"{row['priority_conversions']:,.1f} priority conversions at ${row['priority_cpa']:,.0f} priority CPA, below the ${thresholds['priority_cpa']:,.0f} threshold."
+    return f"Performance is acceptable at ${row['priority_cpa']:,.0f} priority CPA, without enough priority volume to qualify for scaling."
 
 
 def priority_score(row, thresholds):
@@ -169,8 +174,8 @@ def priority_score(row, thresholds):
 
 
 def _has_objective_mismatch(row):
-    enrollment = row.get("enrollment_apply_clicks", 0) + row.get("enrollment_forms", 0)
-    recruitment = row.get("career_clicks", 0) + row.get("applications", 0)
+    enrollment = row.get("enrollment_apply_now_clicks", 0) + row.get("enrollment_forms", 0)
+    recruitment = row.get("applications_submitted", 0)
     return (row["objective"] == "Enrollment" and recruitment > enrollment and recruitment > 0) or (
         row["objective"] == "Recruitment" and enrollment > recruitment and enrollment > 0
     )

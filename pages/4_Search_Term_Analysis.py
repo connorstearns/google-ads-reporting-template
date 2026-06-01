@@ -34,8 +34,8 @@ if "search_term_category" not in search.columns:
 def flag(row):
     text = f"{row.get('search_term', '')} {row.get('campaign', '')}".lower()
     flags = []
-    if row.spend > 0 and row.conversions == 0:
-        flags.append("High spend / no conversion")
+    if row.spend > 0 and row.priority_conversions == 0:
+        flags.append("Spend / no priority conversion")
     if row.objective == "Enrollment" and any(x in text for x in ["career", "job", "teacher"]):
         flags.append("Career term in enrollment campaign")
     if row.objective == "Recruitment" and any(x in text for x in ["enroll", "kindergarten", "scholar", "lottery"]):
@@ -53,11 +53,11 @@ left, right = st.columns(2)
 with left:
     st.plotly_chart(top_n_bar(search, "search_term_category", "spend", 10, "Spend by search term category"), use_container_width=True)
 with right:
-    st.plotly_chart(top_n_bar(search, "search_term", "conversions", 15, "Top search terms by conversions"), use_container_width=True)
+    st.plotly_chart(top_n_bar(search, "search_term", "priority_conversions", 15, "Top search terms by priority conversions"), use_container_width=True)
 
-negative_candidates = term_perf[(term_perf["spend"] > 0) & (term_perf["conversions"] == 0)].sort_values("spend", ascending=False)
+negative_candidates = term_perf[(term_perf["spend"] > 0) & (term_perf["priority_conversions"] == 0)].sort_values("spend", ascending=False)
 unmapped = term_perf[term_perf["search_term_category"].eq("Other / Unmapped")]
 
 render_table(term_perf, "Search term table", "Review search terms by intent, efficiency, and mapping status.", key="search_terms")
-render_table(negative_candidates, "Negative keyword review candidates", "Queries with spend and no measured conversions.", key="negative_candidates")
+render_table(negative_candidates, "Negative keyword review candidates", "Queries with spend and no HCZ priority conversions.", key="negative_candidates")
 render_table(unmapped, "Unmapped search terms", "Terms that need category or objective mapping.", key="unmapped_search_terms")

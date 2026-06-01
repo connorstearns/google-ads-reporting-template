@@ -1,5 +1,5 @@
 import streamlit as st
-from src.formatting import apply_page_style, money, number, percent, kpi_card
+from src.formatting import PRIORITY_CONVERSIONS_HELP, apply_page_style, money, number, percent, kpi_card
 from src.google_sheets import load_workbook
 from src.transforms import combine_primary_data
 from src.filters import render_sidebar, apply_global_filters
@@ -35,15 +35,15 @@ cols = st.columns(5)
 if selected is not None:
     with cols[0]: kpi_card("Spend", money(selected.spend))
     with cols[1]: kpi_card("Clicks", number(selected.clicks))
-    with cols[2]: kpi_card("Conversions", number(selected.conversions, 1))
+    with cols[2]: kpi_card("Total conversions", number(selected.total_conversions, 1))
     with cols[3]: kpi_card("CPA", money(selected.cpa))
-    with cols[4]: kpi_card("Quality CPA", money(selected.quality_cpa))
+    with cols[4]: kpi_card("Priority CPA", money(selected.priority_cpa), help_text=PRIORITY_CONVERSIONS_HELP)
 
 left, right = st.columns(2)
 with left:
     st.plotly_chart(objective_mix_bar(campaign, "spend", "Spend by objective"), use_container_width=True)
 with right:
-    st.plotly_chart(objective_mix_bar(campaign, "quality_conversions", "Quality conversions by objective"), use_container_width=True)
+    st.plotly_chart(objective_mix_bar(campaign, "priority_conversions", "Priority conversions by objective"), use_container_width=True)
 
 st.plotly_chart(metric_trend_line(campaign, "spend", "Weekly spend trend by objective"), use_container_width=True)
 st.plotly_chart(conversion_mix_stacked_bar(campaign, "Conversion mix by objective"), use_container_width=True)

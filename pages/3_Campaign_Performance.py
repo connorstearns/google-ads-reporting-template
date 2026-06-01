@@ -4,12 +4,12 @@ import streamlit as st
 from src.campaign_decisions import build_campaign_decisions, missing_optional_campaign_fields
 from src.charts import (
     campaign_conversion_mix_bar,
-    campaign_quality_cpa_bar,
-    campaign_spend_quality_scatter,
+    campaign_priority_cpa_bar,
+    campaign_spend_priority_scatter,
     campaign_status_spend_bar,
 )
 from src.filters import apply_global_filters, render_sidebar
-from src.formatting import apply_page_style, kpi_card, money, number
+from src.formatting import PRIORITY_CONVERSIONS_HELP, apply_page_style, kpi_card, money, number
 from src.google_sheets import load_workbook
 from src.metrics import summarize
 from src.tables import render_table
@@ -17,13 +17,14 @@ from src.transforms import combine_primary_data
 
 
 ACTION_COLUMNS = [
-    "status", "priority_score", "objective", "campaign", "spend", "quality_conversions",
-    "quality_cpa", "primary_issue", "recommended_action", "rationale",
+    "status", "priority_score", "objective", "campaign", "spend", "priority_conversions",
+    "priority_cpa", "primary_issue", "recommended_action", "rationale",
 ]
 DECISION_COLUMNS = [
     "status", "objective", "campaign", "ad_group", "spend", "spend_share", "impressions",
-    "clicks", "ctr", "cpc", "conversions", "quality_conversions", "enrollment_apply_clicks",
-    "enrollment_forms", "career_clicks", "applications", "cvr", "cpa", "quality_cpa",
+    "clicks", "ctr", "cpc", "total_conversions", "priority_conversions", "priority_cpa",
+    "enrollment_apply_now_clicks", "enrollment_forms", "applications_submitted", "career_clicks",
+    "micro_conversions", "cvr", "cpa",
     "primary_issue", "recommended_action",
 ]
 
@@ -31,7 +32,7 @@ DECISION_COLUMNS = [
 st.set_page_config(page_title="Campaign Performance | HCZ Google Ads", layout="wide")
 apply_page_style()
 st.title("Campaign Performance")
-st.caption("Campaign-management decision dashboard focused on quality outcomes, budget alignment, and the next best action.")
+st.caption("Campaign-management decision dashboard focused on HCZ priority outcomes, budget alignment, and the next best action.")
 
 try:
     data, validation, _ = load_workbook()
@@ -70,8 +71,8 @@ totals = summarize(campaign).iloc[0]
 
 cols = st.columns(6)
 with cols[0]: kpi_card("Total spend", money(totals["spend"]))
-with cols[1]: kpi_card("Quality conversions", number(totals["quality_conversions"], 1))
-with cols[2]: kpi_card("Quality CPA", money(totals["quality_cpa"]))
+with cols[1]: kpi_card("Priority conversions", number(totals["priority_conversions"], 1), help_text=PRIORITY_CONVERSIONS_HELP)
+with cols[2]: kpi_card("Priority CPA", money(totals["priority_cpa"]), help_text=PRIORITY_CONVERSIONS_HELP)
 with cols[3]: kpi_card("Campaigns to investigate", number((campaign_level["status"] == "Investigate").sum()))
 with cols[4]: kpi_card("Campaigns to optimize", number((campaign_level["status"] == "Optimize").sum()))
 with cols[5]: kpi_card("Campaigns eligible to scale", number((campaign_level["status"] == "Scale").sum()))
@@ -87,15 +88,15 @@ render_table(
     display_columns=ACTION_COLUMNS,
 )
 
-st.subheader("Spend and quality outcome alignment")
+st.subheader("Spend and priority outcome alignment")
 st.caption("Campaigns should move up and to the right. Bubble size reflects click volume; hover for the reason behind each status.")
-st.plotly_chart(campaign_spend_quality_scatter(campaign_level), use_container_width=True)
+st.plotly_chart(campaign_spend_priority_scatter(campaign_level), use_container_width=True)
 
 st.subheader("Campaign diagnostic charts")
 left, right = st.columns(2)
 with left:
-    quality_cpa_chart = campaign_quality_cpa_bar(campaign_level, thresholds["min_spend"], thresholds["min_quality_conversions"])
-    st.plotly_chart(quality_cpa_chart, use_container_width=True)
+    priority_cpa_chart = campaign_priority_cpa_bar(campaign_level, thresholds["min_spend"], thresholds["min_priority_conversions"])
+    st.plotly_chart(priority_cpa_chart, use_container_width=True)
 with right:
     st.plotly_chart(campaign_status_spend_bar(campaign_level), use_container_width=True)
 
@@ -103,28 +104,28 @@ mix_chart = campaign_conversion_mix_bar(campaign_level)
 if mix_chart.data:
     st.plotly_chart(mix_chart, use_container_width=True)
 else:
-    st.info("Conversion mix chart is unavailable because detailed quality outcome columns are not present.")
+    st.info("Conversion mix chart is unavailable because detailed conversion outcome columns are not present.")
 
 st.subheader("Campaign decision table")
 st.caption("Use status and primary issue together: status says what to do next, while the issue explains why.")
 render_table(
     decision_table,
     "Campaign and ad group decisions",
-    "Full decision view with quality outcomes before efficiency metrics.",
+    "Full decision view with HCZ priority outcomes before efficiency metrics.",
     sort_by="priority_score",
     key="campaign_decisions",
     display_columns=DECISION_COLUMNS,
 )
 
 with st.expander("Supporting campaign views", expanded=False):
-    tab1, tab2, tab3, tab4 = st.tabs(["Highest spend", "Highest quality conversions", "High CPA", "Zero quality conversions"])
+    tab1, tab2, tab3, tab4 = st.tabs(["Highest spend", "Highest priority conversions", "High CPA", "Zero priority conversions"])
     with tab1:
         render_table(campaign_level.sort_values("spend", ascending=False).head(50), "Highest spend", key="highest_spend")
     with tab2:
-        render_table(campaign_level.sort_values("quality_conversions", ascending=False).head(50), "Highest quality conversions", key="highest_quality_conversions")
+        render_table(campaign_level.sort_values("priority_conversions", ascending=False).head(50), "Highest priority conversions", key="highest_priority_conversions")
     with tab3:
         meaningful = campaign_level[(campaign_level["spend"] >= thresholds["min_spend"]) & (campaign_level["conversions"] > 0)]
         render_table(meaningful.sort_values("cpa", ascending=False).head(50), "High CPA", key="high_cpa")
     with tab4:
-        zero_quality = campaign_level[(campaign_level["spend"] > 0) & (campaign_level["quality_conversions"] == 0)]
-        render_table(zero_quality.sort_values("spend", ascending=False).head(50), "Zero quality conversions", key="zero_quality_conversions")
+        zero_priority = campaign_level[(campaign_level["spend"] > 0) & (campaign_level["priority_conversions"] == 0)]
+        render_table(zero_priority.sort_values("spend", ascending=False).head(50), "Zero priority conversions", key="zero_priority_conversions")

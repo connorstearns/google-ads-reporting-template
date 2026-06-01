@@ -22,7 +22,7 @@ def metric_trend_line(df, metric="spend", title="Performance trend", freq="W"):
     return _layout(fig)
 
 
-def spend_vs_conversions_bar_line(df, title="Spend and conversions over time", freq="W"):
+def spend_vs_conversions_bar_line(df, title="Spend and priority conversions over time", freq="W"):
     if df.empty or "date" not in df.columns:
         return go.Figure()
     temp = df.dropna(subset=["date"]).copy()
@@ -30,9 +30,9 @@ def spend_vs_conversions_bar_line(df, title="Spend and conversions over time", f
     grouped = summarize(temp, ["period"])
     fig = make_subplots(specs=[[{"secondary_y": True}]])
     fig.add_bar(x=grouped["period"], y=grouped["spend"], name="Spend", marker_color="#2563eb")
-    fig.add_trace(go.Scatter(x=grouped["period"], y=grouped["conversions"], name="Conversions", mode="lines+markers", line_color="#16a34a"), secondary_y=True)
+    fig.add_trace(go.Scatter(x=grouped["period"], y=grouped["priority_conversions"], name="Priority conversions", mode="lines+markers", line_color="#16a34a"), secondary_y=True)
     fig.update_yaxes(title_text="Spend ($)", tickprefix="$", secondary_y=False)
-    fig.update_yaxes(title_text="Conversions", secondary_y=True)
+    fig.update_yaxes(title_text="Priority conversions", secondary_y=True)
     fig.update_layout(title=title)
     return _layout(fig)
 
@@ -62,15 +62,19 @@ def top_n_bar(df, group_col, metric="spend", n=10, title=None):
     grouped = summarize(df, [group_col]).sort_values(metric, ascending=False).head(n)
     fig = px.bar(grouped.sort_values(metric), x=metric, y=group_col, orientation="h",
                  title=title or f"Top {n} by {metric}", labels={metric: metric.title(), group_col: group_col.replace("_", " ").title()})
-    if metric in {"spend", "cpa", "cpc", "quality_cpa"}:
+    if metric in {"spend", "cpa", "cpc", "priority_cpa", "quality_cpa"}:
         fig.update_xaxes(tickprefix="$")
     return _layout(fig)
 
 
 def conversion_mix_stacked_bar(df, title="Conversion mix"):
-    if df.empty or "conversion_type" not in df.columns:
+    if df.empty or "objective" not in df.columns:
         return go.Figure()
-    grouped = df.groupby(["objective", "conversion_type"], dropna=False, as_index=False)["conversions"].sum()
+    metrics = ["enrollment_apply_now_clicks", "enrollment_forms", "applications_submitted", "career_clicks", "micro_conversions"]
+    available = [metric for metric in metrics if metric in df.columns]
+    grouped = df.groupby("objective", dropna=False, as_index=False)[available].sum()
+    grouped = grouped.melt(id_vars="objective", var_name="conversion_type", value_name="conversions")
+    grouped["conversion_type"] = grouped["conversion_type"].map(_conversion_mix_label)
     fig = px.bar(grouped, x="objective", y="conversions", color="conversion_type", title=title,
                  labels={"objective": "Objective", "conversion_type": "Conversion type"})
     return _layout(fig)
@@ -87,14 +91,14 @@ def weekly_heatmap_if_useful(df, metric="spend", title="Weekly heatmap"):
     return _layout(fig)
 
 
-def campaign_spend_quality_scatter(df, title="Spend vs quality conversions by campaign"):
+def campaign_spend_priority_scatter(df, title="Spend vs priority conversions by campaign"):
     if df.empty:
         return go.Figure()
     size = df["clicks"].clip(lower=1)
     fig = px.scatter(
         df,
         x="spend",
-        y="quality_conversions",
+        y="priority_conversions",
         size=size,
         color="status",
         hover_name="campaign",
@@ -102,32 +106,32 @@ def campaign_spend_quality_scatter(df, title="Spend vs quality conversions by ca
             "objective": True,
             "spend": ":$,.0f",
             "clicks": ":,.0f",
-            "quality_conversions": ":,.1f",
-            "quality_cpa": ":$,.0f",
+            "priority_conversions": ":,.1f",
+            "priority_cpa": ":$,.0f",
             "status": True,
             "primary_issue": True,
         },
         title=title,
-        labels={"spend": "Spend", "quality_conversions": "Quality conversions"},
+        labels={"spend": "Spend", "priority_conversions": "Priority conversions"},
     )
     fig.update_xaxes(tickprefix="$")
     return _layout(fig)
 
 
-def campaign_quality_cpa_bar(df, min_spend, min_quality_conversions, title="Quality CPA by campaign"):
-    meaningful = df[(df["spend"] >= min_spend) & (df["quality_conversions"] >= min_quality_conversions)].copy()
+def campaign_priority_cpa_bar(df, min_spend, min_priority_conversions, title="Priority CPA by campaign"):
+    meaningful = df[(df["spend"] >= min_spend) & (df["priority_conversions"] >= min_priority_conversions)].copy()
     if meaningful.empty:
         return go.Figure()
-    meaningful = meaningful.sort_values("quality_cpa", ascending=False).head(15)
+    meaningful = meaningful.sort_values("priority_cpa", ascending=False).head(15)
     fig = px.bar(
-        meaningful.sort_values("quality_cpa"),
-        x="quality_cpa",
+        meaningful.sort_values("priority_cpa"),
+        x="priority_cpa",
         y="campaign",
         color="objective",
         orientation="h",
         color_discrete_map=OBJECTIVE_COLORS,
         title=title,
-        labels={"quality_cpa": "Quality CPA", "campaign": "Campaign"},
+        labels={"priority_cpa": "Priority CPA", "campaign": "Campaign"},
     )
     fig.update_xaxes(tickprefix="$")
     return _layout(fig)
@@ -136,21 +140,21 @@ def campaign_quality_cpa_bar(df, min_spend, min_quality_conversions, title="Qual
 def campaign_conversion_mix_bar(df, title="Conversion mix by campaign"):
     if df.empty:
         return go.Figure()
-    metrics = ["enrollment_apply_clicks", "enrollment_forms", "career_clicks", "applications"]
+    metrics = ["enrollment_apply_now_clicks", "enrollment_forms", "applications_submitted", "career_clicks", "micro_conversions"]
     available = [col for col in metrics if col in df.columns and df[col].sum() > 0]
     if not available:
         return go.Figure()
     top_campaigns = df.groupby("campaign", as_index=False)["spend"].sum().nlargest(12, "spend")["campaign"]
     melted = df[df["campaign"].isin(top_campaigns)].groupby("campaign", as_index=False)[available].sum()
     melted = melted.melt(id_vars="campaign", var_name="conversion_type", value_name="conversions")
-    melted["conversion_type"] = melted["conversion_type"].str.replace("_", " ").str.title()
+    melted["conversion_type"] = melted["conversion_type"].map(_conversion_mix_label)
     fig = px.bar(
         melted,
         x="campaign",
         y="conversions",
         color="conversion_type",
         title=title,
-        labels={"campaign": "Campaign", "conversions": "Quality outcomes", "conversion_type": "Outcome"},
+        labels={"campaign": "Campaign", "conversions": "Conversions", "conversion_type": "Outcome"},
     )
     fig.update_xaxes(tickangle=-35)
     return _layout(fig)
@@ -163,3 +167,13 @@ def campaign_status_spend_bar(df, title="Spend by campaign status"):
     fig = px.bar(grouped, x="status", y="spend", color="status", title=title, labels={"status": "Status", "spend": "Spend"})
     fig.update_yaxes(tickprefix="$")
     return _layout(fig)
+
+
+def _conversion_mix_label(metric):
+    return {
+        "enrollment_apply_now_clicks": "Enrollment Apply Now Clicks",
+        "enrollment_forms": "Enrollment Forms",
+        "applications_submitted": "Applications Submitted",
+        "career_clicks": "Career Clicks",
+        "micro_conversions": "Other / Micro Conversions",
+    }.get(metric, metric.replace("_", " ").title())

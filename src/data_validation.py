@@ -23,8 +23,13 @@ COLUMN_ALIASES = {
     "conversion_category": "conversion_type",
     "quality_conversions": "quality_conversions",
     "quality_conversions_count": "quality_conversions",
+    "priority_conversions": "priority_conversions",
+    "priority_cpa": "priority_cpa",
+    "micro_conversions": "micro_conversions",
+    "total_conversions": "total_conversions",
     "career_clicks": "career_clicks",
     "applications": "applications",
+    "applications_submitted": "applications_submitted",
     "enrollment_apply_now_clicks": "enrollment_apply_now_clicks",
     "enrollment_apply_clicks": "enrollment_apply_clicks",
     "enrollment_forms": "enrollment_forms",
@@ -90,8 +95,9 @@ def coerce_types(df):
     out = df.copy()
     if "date" in out.columns:
         out["date"] = pd.to_datetime(out["date"], errors="coerce")
-    for col in ["spend", "impressions", "clicks", "conversions", "quality_conversions",
-                "career_clicks", "applications", "enrollment_apply_now_clicks", "enrollment_apply_clicks", "enrollment_forms"]:
+    for col in ["spend", "impressions", "clicks", "conversions", "total_conversions", "priority_conversions",
+                "priority_cpa", "micro_conversions", "quality_conversions", "career_clicks", "applications",
+                "applications_submitted", "enrollment_apply_now_clicks", "enrollment_apply_clicks", "enrollment_forms"]:
         if col in out.columns:
             out[col] = (
                 out[col].astype(str)

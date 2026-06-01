@@ -37,18 +37,18 @@ if "page_group" not in landing.columns:
 
 page_perf = summarize(landing, ["objective", "campaign", "final_url", "page_group"])
 page_perf["review_flag"] = ""
-page_perf.loc[(page_perf["spend"] > 0) & (page_perf["quality_conversions"] == 0), "review_flag"] = "Spend with weak conversion quality"
+page_perf.loc[(page_perf["spend"] > 0) & (page_perf["priority_conversions"] == 0), "review_flag"] = "Spend with no priority conversions"
 page_perf.loc[page_perf["page_group"].eq("Other / Unmapped"), "review_flag"] = page_perf["review_flag"].where(page_perf["review_flag"].eq(""), page_perf["review_flag"] + "; ") + "URL mapping gap"
 
 left, right = st.columns(2)
 with left:
     st.plotly_chart(top_n_bar(landing, "page_group", "spend", 10, "Spend by page group"), use_container_width=True)
 with right:
-    st.plotly_chart(top_n_bar(landing, "final_url", "conversions", 15, "Conversions by landing page"), use_container_width=True)
+    st.plotly_chart(top_n_bar(landing, "final_url", "priority_conversions", 15, "Priority conversions by landing page"), use_container_width=True)
 
-weak = page_perf[(page_perf["spend"] > 0) & (page_perf["quality_conversions"] == 0)].sort_values("spend", ascending=False)
+weak = page_perf[(page_perf["spend"] > 0) & (page_perf["priority_conversions"] == 0)].sort_values("spend", ascending=False)
 unmapped = page_perf[page_perf["page_group"].eq("Other / Unmapped")]
 
-render_table(page_perf, "Landing page performance", "Final URL view for spend, traffic, quality outcomes, and efficiency.", key="landing_pages")
-render_table(weak, "Landing pages with weak intent quality", "Pages receiving spend without quality conversions.", key="weak_landing")
+render_table(page_perf, "Landing page performance", "Final URL view for spend, traffic, priority outcomes, and efficiency.", key="landing_pages")
+render_table(weak, "Landing pages with weak priority outcomes", "Pages receiving spend without priority conversions.", key="weak_landing")
 render_table(unmapped, "URL mapping gaps", "Landing pages that need a page group or objective mapping.", key="unmapped_landing")

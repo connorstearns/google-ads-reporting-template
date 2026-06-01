@@ -13,10 +13,18 @@ def add_review_flags(df, entity_col, entity_type, thresholds):
         score = 0
         if r.spend >= thresholds["min_spend"] and r.conversions == 0:
             issues.append(("High spend, no conversions", 3, "Review budget allocation"))
-        if r.spend >= thresholds["min_spend"] and r.quality_conversions == 0:
-            issues.append(("High spend, no quality conversions", 3, "Investigate conversion quality"))
-        if r.conversions > 0 and r.cpa > thresholds["cpa"]:
-            issues.append(("CPA above threshold", 2, "Review bids, targeting, and landing page alignment"))
+        if r.spend >= thresholds["min_spend"] and r.priority_conversions == 0:
+            issues.append(("High spend, no priority conversions", 3, "Investigate priority conversion path"))
+        if entity_type == "Campaign" and r.get("objective") == "Enrollment" and r.enrollment_apply_now_clicks == 0 and r.enrollment_forms == 0:
+            issues.append(("Enrollment campaign missing Apply Now clicks/forms", 2, "Review enrollment conversion path"))
+        if entity_type == "Campaign" and r.get("objective") == "Recruitment" and r.applications_submitted == 0:
+            issues.append(("Recruitment campaign missing applications submitted", 2, "Review application submission tracking and funnel"))
+        if entity_type == "Campaign" and r.career_clicks > 0 and r.applications_submitted == 0:
+            issues.append(("Career clicks present but no applications submitted", 2, "Review recruitment landing page and application flow"))
+        if r.total_conversions > 0 and r.priority_conversions == 0:
+            issues.append(("Total conversions present but no priority conversions", 2, "Check conversion action mapping and optimization goals"))
+        if r.priority_conversions > 0 and r.priority_cpa > thresholds["priority_cpa"]:
+            issues.append(("Priority CPA above threshold", 2, "Review bids, targeting, and landing page alignment"))
         if r.clicks >= thresholds["min_clicks"] and r.ctr < thresholds["ctr"]:
             issues.append(("CTR below threshold", 1, "Review ad relevance and query alignment"))
         if r.clicks >= thresholds["min_clicks"] and r.cpc > thresholds["cpc"]:
@@ -32,8 +40,9 @@ def add_review_flags(df, entity_col, entity_type, thresholds):
                 "objective": r.get("objective", "Other / Unmapped"),
                 "spend": r.spend,
                 "clicks": r.clicks,
-                "conversions": r.conversions,
-                "quality_conversions": r.quality_conversions,
+                "total_conversions": r.total_conversions,
+                "priority_conversions": r.priority_conversions,
+                "priority_cpa": r.priority_cpa,
                 "cpa": r.cpa,
                 "recommended_action": action,
                 "notes": f"{entity_type} triggered {issue.lower()} under current thresholds.",
