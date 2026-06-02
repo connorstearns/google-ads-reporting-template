@@ -4,12 +4,11 @@ from src.benchmarks import (
     RECRUITMENT_CAVEAT,
     UNAVAILABLE_MESSAGE,
     get_campaign_type_benchmarks,
-    get_latest_complete_benchmark_month,
     latest_complete_benchmarks,
     priority_cpa_display,
     recruitment_caveat_present,
-    yoy_percentage_display,
 )
+from src.benchmark_cards import render_metric_grid
 from src.formatting import apply_page_style
 from src.google_sheets import load_workbook
 from src.transforms import combine_primary_data
@@ -104,72 +103,33 @@ render_table(campaign_summary.head(50), "Campaign diagnostics", "Top campaign ro
 st.subheader("Performance vs Benchmarks")
 st.caption("Benchmark cards use the latest complete month to avoid comparing partial current-month data against full historical periods.")
 benchmarks = get_campaign_type_benchmarks(data)
-latest_available_month = benchmarks["month"].max() if not benchmarks.empty else None
-latest_complete_month = get_latest_complete_benchmark_month(benchmarks)
 latest, benchmark_month_used, used_incomplete_fallback = latest_complete_benchmarks(benchmarks)
-current_month = pd.Timestamp.today().to_period("M").start_time
-current_month_rows_excluded = (
-    not benchmarks.empty
-    and benchmarks["month"].dt.to_period("M").dt.start_time.eq(current_month).any()
-    and benchmark_month_used != current_month
-)
 if latest.empty:
     st.info(UNAVAILABLE_MESSAGE)
 else:
     if used_incomplete_fallback:
         st.warning("No complete benchmark month is available. Benchmark cards are using the latest available month, which may be partial.")
-    preferred_cards = [
-        ("Nonbrand Search", "Enrollment"),
-        ("Nonbrand Search", "Recruitment"),
-        ("Performance Max", "Enrollment"),
-        ("Performance Max", "Recruitment"),
-    ]
-    card_rows = []
+    st.caption(f"Benchmark month: {benchmark_month_used:%b %Y}")
+    preferred_cards = [("Nonbrand Search", "Enrollment"), ("Nonbrand Search", "Recruitment")]
+    if st.checkbox("Show Performance Max benchmark cards", value=False):
+        preferred_cards += [("Performance Max", "Enrollment"), ("Performance Max", "Recruitment")]
+    rendered = False
     for campaign_type, objective_name in preferred_cards:
         matched = latest[
             latest["campaign_type"].astype(str).str.casefold().eq(campaign_type.casefold())
             & latest["objective"].astype(str).str.casefold().eq(objective_name.casefold())
         ]
         if not matched.empty:
-            card_rows.append(matched.iloc[0])
-    if card_rows:
-        cols = st.columns(len(card_rows))
-        for col, benchmark in zip(cols, card_rows):
-            with col:
-                st.markdown(f"**{benchmark['campaign_type']} / {benchmark['objective']}**")
-                kpi_card("Priority CPA", priority_cpa_display(benchmark.get("priority_cpa"), benchmark.get("priority_conversions")))
-                st.caption(f"3Mo Benchmark Status: {benchmark.get('benchmark_status', '-')}")
-                st.caption(f"YoY Benchmark Status: {benchmark.get('yoy_benchmark_status', '-')}")
-                st.caption(f"Priority CPA YoY: {yoy_percentage_display(benchmark, 'priority_cpa_yoy_pct')}")
-                st.caption(f"Priority Conversions YoY: {yoy_percentage_display(benchmark, 'priority_conversions_yoy_pct')}")
-    else:
+            rendered = True
+            st.markdown(f"**{campaign_type} / {objective_name}**")
+            render_metric_grid(matched.iloc[0], objective_name)
+    if not rendered:
         st.info("The latest benchmark month does not include the featured campaign type and objective combinations.")
     if recruitment_caveat_present(latest):
         st.warning(
             f"{RECRUITMENT_CAVEAT}: Applications Submitted was not consistently tracked before July 2025, "
             "so Recruitment YoY priority-conversion comparisons should be treated cautiously."
         )
-    takeaway_columns = [
-        "campaign_type", "objective", "benchmark_status", "yoy_benchmark_status",
-        "priority_cpa", "prior_year_priority_cpa", "yoy_benchmark_note",
-    ]
-    render_table(
-        latest,
-        "Biggest Benchmark Takeaways",
-        "Latest campaign-type benchmark readout from the Google Sheet.",
-        sort_by=None,
-        key="executive_benchmark_takeaways",
-        display_columns=takeaway_columns,
-    )
-    with st.expander("Benchmark card debug", expanded=False):
-        selected_date_range = filters.get("date_range")
-        st.write(f"Selected dashboard date range: `{selected_date_range or 'All available dates'}`")
-        st.write(f"Benchmark month used: `{benchmark_month_used:%b %Y}`")
-        st.write(f"Latest available benchmark month: `{latest_available_month:%b %Y}`")
-        st.write(f"Latest complete benchmark month: `{latest_complete_month.strftime('%b %Y') if latest_complete_month is not None else 'None available'}`")
-        st.write(f"Current month rows excluded: `{'Yes' if current_month_rows_excluded else 'No'}`")
-        st.caption("Rows used for the benchmark cards")
-        st.dataframe(pd.DataFrame(card_rows), use_container_width=True, hide_index=True)
 
 with st.expander("Data Source Debug", expanded=False):
     render_data_source_debug(campaign)
