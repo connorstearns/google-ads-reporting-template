@@ -117,11 +117,25 @@ COLUMN_ALIASES = {
     "trailing_3mo_median_cost_per_enrollment_form": "trailing_3mo_median_cost_per_enrollment_form",
     "trailing_3mo_median_cost_per_application_submitted": "trailing_3mo_median_cost_per_application_submitted",
     "prior_year_enrollment_apply_now_clicks": "prior_year_enrollment_apply_now_clicks",
+    "prior_year_apply_now_clicks": "prior_year_apply_now_clicks",
+    "apply_now_clicks_yoy_pct": "apply_now_clicks_yoy_pct",
+    "trailing_3mo_median_apply_now_clicks": "trailing_3mo_median_apply_now_clicks",
+    "apply_now_clicks_vs_3mo_median": "apply_now_clicks_vs_3mo_median",
     "prior_year_enrollment_forms": "prior_year_enrollment_forms",
+    "enrollment_forms_yoy_pct": "enrollment_forms_yoy_pct",
+    "enrollment_forms_vs_3mo_median": "enrollment_forms_vs_3mo_median",
     "prior_year_career_clicks": "prior_year_career_clicks",
+    "career_clicks_yoy_pct": "career_clicks_yoy_pct",
+    "career_clicks_vs_3mo_median": "career_clicks_vs_3mo_median",
     "prior_year_applications_submitted": "prior_year_applications_submitted",
+    "applications_submitted_yoy_pct": "applications_submitted_yoy_pct",
+    "applications_submitted_vs_3mo_median": "applications_submitted_vs_3mo_median",
     "prior_year_cost_per_enrollment_form": "prior_year_cost_per_enrollment_form",
+    "cost_per_enrollment_form_yoy_pct": "cost_per_enrollment_form_yoy_pct",
+    "cost_per_enrollment_form_vs_3mo_median": "cost_per_enrollment_form_vs_3mo_median",
     "prior_year_cost_per_application_submitted": "prior_year_cost_per_application_submitted",
+    "cost_per_application_submitted_yoy_pct": "cost_per_application_submitted_yoy_pct",
+    "cost_per_application_submitted_vs_3mo_median": "cost_per_application_submitted_vs_3mo_median",
 }
 
 
@@ -158,12 +172,25 @@ PRESERVE_MISSING_NUMERIC_COLUMNS = {
     "clicks_yoy_pct",
     "priority_conversions_yoy_pct",
     "priority_cpa_yoy_pct",
+    "apply_now_clicks_yoy_pct",
+    "enrollment_forms_yoy_pct",
+    "cost_per_enrollment_form_yoy_pct",
+    "career_clicks_yoy_pct",
+    "applications_submitted_yoy_pct",
+    "cost_per_application_submitted_yoy_pct",
     "prior_year_enrollment_apply_now_clicks",
+    "prior_year_apply_now_clicks",
     "prior_year_enrollment_forms",
     "prior_year_career_clicks",
     "prior_year_applications_submitted",
     "prior_year_cost_per_enrollment_form",
     "prior_year_cost_per_application_submitted",
+    "apply_now_clicks_yoy_pct",
+    "enrollment_forms_yoy_pct",
+    "cost_per_enrollment_form_yoy_pct",
+    "career_clicks_yoy_pct",
+    "applications_submitted_yoy_pct",
+    "cost_per_application_submitted_yoy_pct",
 }
 
 
@@ -216,7 +243,14 @@ def coerce_types(df):
                 "trailing_3mo_median_cost_per_enrollment_form", "trailing_3mo_median_cost_per_application_submitted",
                 "prior_year_enrollment_apply_now_clicks", "prior_year_enrollment_forms",
                 "prior_year_career_clicks", "prior_year_applications_submitted",
-                "prior_year_cost_per_enrollment_form", "prior_year_cost_per_application_submitted"]:
+                "prior_year_cost_per_enrollment_form", "prior_year_cost_per_application_submitted",
+                "prior_year_apply_now_clicks", "apply_now_clicks_yoy_pct", "apply_now_clicks_vs_3mo_median",
+                "enrollment_forms_yoy_pct", "enrollment_forms_vs_3mo_median",
+                "cost_per_enrollment_form_yoy_pct", "cost_per_enrollment_form_vs_3mo_median",
+                "career_clicks_yoy_pct", "career_clicks_vs_3mo_median",
+                "applications_submitted_yoy_pct", "applications_submitted_vs_3mo_median",
+                "cost_per_application_submitted_yoy_pct", "cost_per_application_submitted_vs_3mo_median",
+                "trailing_3mo_median_apply_now_clicks"]:
         if col in out.columns:
             raw = out[col].astype(str)
             percent_mask = raw.str.contains("%", regex=False)
@@ -226,7 +260,7 @@ def coerce_types(df):
                 .str.replace(",", "", regex=False)
                 .str.replace("%", "", regex=False)
             )
-            out[col] = pd.to_numeric(out[col], errors="coerce")
+            out[col] = pd.to_numeric(out[col], errors="coerce").astype(float)
             if col not in PRESERVE_MISSING_NUMERIC_COLUMNS:
                 out[col] = out[col].fillna(0)
             out.loc[percent_mask, col] = out.loc[percent_mask, col] / 100

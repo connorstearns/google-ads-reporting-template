@@ -47,7 +47,13 @@ def render_table(df, title, caption="", sort_by="spend", search_cols=None, key=N
         "ctr", "cvr", "spend_share", "click_share", "conversion_share", "spend_yoy_pct",
         "clicks_yoy_pct", "priority_conversions_yoy_pct", "priority_cpa_yoy_pct",
         "priority_cpa_vs_3mo_median", "priority_cpa_vs_3mo_benchmark",
-        "priority_conversions_vs_3mo_median", "variance_pct",
+        "priority_conversions_vs_3mo_median", "apply_now_clicks_yoy_pct",
+        "apply_now_clicks_vs_3mo_median", "enrollment_forms_yoy_pct",
+        "enrollment_forms_vs_3mo_median", "cost_per_enrollment_form_yoy_pct",
+        "cost_per_enrollment_form_vs_3mo_median", "career_clicks_yoy_pct",
+        "career_clicks_vs_3mo_median", "applications_submitted_yoy_pct",
+        "applications_submitted_vs_3mo_median", "cost_per_application_submitted_yoy_pct",
+        "cost_per_application_submitted_vs_3mo_median", "variance_pct",
     ]:
         if pct_col in shown.columns:
             shown[pct_col] = shown[pct_col] * 100

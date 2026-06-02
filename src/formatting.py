@@ -97,6 +97,18 @@ def metric_column_config():
         "priority_cpa_vs_3mo_median": st.column_config.NumberColumn("Priority CPA vs 3Mo Median", format="%.1f%%"),
         "priority_cpa_vs_3mo_benchmark": st.column_config.NumberColumn("Priority CPA vs 3Mo Benchmark", format="%.1f%%"),
         "priority_conversions_vs_3mo_median": st.column_config.NumberColumn("Priority Conversions vs 3Mo Median", format="%.1f%%"),
+        "apply_now_clicks_yoy_pct": st.column_config.NumberColumn("Apply Now Clicks YoY %", format="%.1f%%"),
+        "apply_now_clicks_vs_3mo_median": st.column_config.NumberColumn("Apply Now Clicks vs 3Mo Median", format="%.1f%%"),
+        "enrollment_forms_yoy_pct": st.column_config.NumberColumn("Enrollment Forms YoY %", format="%.1f%%"),
+        "enrollment_forms_vs_3mo_median": st.column_config.NumberColumn("Enrollment Forms vs 3Mo Median", format="%.1f%%"),
+        "cost_per_enrollment_form_yoy_pct": st.column_config.NumberColumn("Cost per Enrollment Form YoY %", format="%.1f%%"),
+        "cost_per_enrollment_form_vs_3mo_median": st.column_config.NumberColumn("Cost per Enrollment Form vs 3Mo Median", format="%.1f%%"),
+        "career_clicks_yoy_pct": st.column_config.NumberColumn("Career Clicks YoY %", format="%.1f%%"),
+        "career_clicks_vs_3mo_median": st.column_config.NumberColumn("Career Clicks vs 3Mo Median", format="%.1f%%"),
+        "applications_submitted_yoy_pct": st.column_config.NumberColumn("Applications Submitted YoY %", format="%.1f%%"),
+        "applications_submitted_vs_3mo_median": st.column_config.NumberColumn("Applications Submitted vs 3Mo Median", format="%.1f%%"),
+        "cost_per_application_submitted_yoy_pct": st.column_config.NumberColumn("Cost per Application Submitted YoY %", format="%.1f%%"),
+        "cost_per_application_submitted_vs_3mo_median": st.column_config.NumberColumn("Cost per Application Submitted vs 3Mo Median", format="%.1f%%"),
         "variance_pct": st.column_config.NumberColumn("Variance %", format="%.1f%%"),
     }
 
