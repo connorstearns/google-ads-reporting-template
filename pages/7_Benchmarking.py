@@ -49,53 +49,87 @@ def display_number(value):
     return number(value, 1)
 
 
-def display_ratio(numerator, denominator, suffix=""):
-    if denominator is None or pd.isna(denominator) or denominator <= 0:
+def valid_number(value):
+    return value is not None and not pd.isna(value)
+
+
+def text_or_empty(value):
+    return "" if value is None or pd.isna(value) else str(value).strip()
+
+
+def ratio_or_none(numerator, denominator):
+    if not valid_number(numerator) or not valid_number(denominator) or denominator <= 0:
+        return None
+    return numerator / denominator
+
+
+def current_metric_value(row, spec):
+    value = row.get(spec["metric"])
+    if spec.get("denominator"):
+        denominator = row.get(spec["denominator"])
+        if not valid_number(denominator) or denominator <= 0:
+            return None
+        if not valid_number(value) or value <= 0:
+            return ratio_or_none(row.get("spend"), denominator)
+    return value if valid_number(value) else None
+
+
+def benchmark_metric_value(row, spec, period):
+    benchmark_col = spec[f"{period}_benchmark"]
+    value = row.get(benchmark_col)
+    if valid_number(value) and value > 0:
+        return value
+    if period == "yoy" and spec.get("prior_denominator"):
+        return ratio_or_none(row.get("prior_year_spend"), row.get(spec["prior_denominator"]))
+    return None
+
+
+def format_metric_value(value, kind):
+    if not valid_number(value):
         return "—"
-    if numerator is None or pd.isna(numerator):
+    return money(value) if kind == "cost" else number(value, 1)
+
+
+def benchmark_delta(current, benchmark, unavailable_label):
+    if not valid_number(benchmark) or benchmark <= 0:
+        return unavailable_label
+    if not valid_number(current):
         return "—"
-    return f"{numerator / denominator:,.1f}{suffix}"
+    delta = (current - benchmark) / benchmark
+    relation = "above" if delta >= 0 else "below"
+    return f"{abs(delta) * 100:,.1f}% {relation} benchmark"
 
 
-def display_cost(row, metric, denominator):
-    if denominator is None or pd.isna(denominator) or denominator <= 0:
-        return "—"
-    value = row.get(metric)
-    spend = row.get("spend")
-    if value is None or pd.isna(value) or (value <= 0 and spend is not None and not pd.isna(spend) and spend > 0):
-        if spend is None or pd.isna(spend):
-            return "—"
-        value = spend / denominator
-    return money(value)
+def render_metric_card(row, spec):
+    current = current_metric_value(row, spec)
+    trailing = benchmark_metric_value(row, spec, "trailing")
+    yoy = benchmark_metric_value(row, spec, "yoy")
+    yoy_status = text_or_empty(row.get("yoy_benchmark_status"))
+    trailing_delta = benchmark_delta(current, trailing, "Insufficient 3Mo history").replace(" benchmark", " 3Mo benchmark")
+    if spec.get("recruitment_caveat") and yoy_status == RECRUITMENT_CAVEAT:
+        yoy_delta = "YoY tracking caveat"
+    else:
+        yoy_delta = benchmark_delta(current, yoy, "No YoY benchmark").replace(" benchmark", " YoY benchmark")
+    delta_color = "inverse" if spec["kind"] == "cost" else "normal"
+    st.metric(spec["label"], format_metric_value(current, spec["kind"]), delta=trailing_delta, delta_color=delta_color)
+    st.caption(f"YoY: {yoy_delta}")
+    st.caption(f"3Mo benchmark: {format_metric_value(trailing, spec['kind'])}")
+    st.caption(f"YoY benchmark: {format_metric_value(yoy, spec['kind'])}")
 
 
-def render_enrollment_components(row):
-    apply_now_clicks = row.get("enrollment_apply_now_clicks")
-    enrollment_forms = row.get("enrollment_forms")
-    priority_conversions = row.get("priority_conversions")
-    st.caption("Priority Conversions combine Apply Now clicks and Enrollment Forms. Forms are the stronger downstream action.")
-    st.caption(f"Enrollment Apply Now Clicks: {display_number(apply_now_clicks)}")
-    st.caption(f"Enrollment Forms: {display_number(enrollment_forms)}")
-    st.caption(f"Cost / Enrollment Form: {display_cost(row, 'cost_per_enrollment_form', enrollment_forms)}")
-    st.caption(f"Form Share of Priority: {display_share(enrollment_forms, priority_conversions)}")
+ENROLLMENT_METRICS = [
+    {"label": "Enrollment Apply Now Clicks", "metric": "enrollment_apply_now_clicks", "kind": "volume", "trailing_benchmark": "trailing_3mo_median_enrollment_apply_now_clicks", "yoy_benchmark": "prior_year_enrollment_apply_now_clicks"},
+    {"label": "Enrollment Forms", "metric": "enrollment_forms", "kind": "volume", "trailing_benchmark": "trailing_3mo_median_enrollment_forms", "yoy_benchmark": "prior_year_enrollment_forms"},
+    {"label": "Priority CPA", "metric": "priority_cpa", "kind": "cost", "denominator": "priority_conversions", "trailing_benchmark": "trailing_3mo_median_priority_cpa", "yoy_benchmark": "prior_year_priority_cpa"},
+    {"label": "Cost / Enrollment Form", "metric": "cost_per_enrollment_form", "kind": "cost", "denominator": "enrollment_forms", "trailing_benchmark": "trailing_3mo_median_cost_per_enrollment_form", "yoy_benchmark": "prior_year_cost_per_enrollment_form", "prior_denominator": "prior_year_enrollment_forms"},
+]
 
-
-def render_recruitment_components(row):
-    career_clicks = row.get("career_clicks")
-    applications_submitted = row.get("applications_submitted")
-    st.caption("Applications Submitted are the priority outcome. Career Clicks are shown as a diagnostic intent signal.")
-    st.caption(f"Career Clicks: {display_number(career_clicks)}")
-    st.caption(f"Applications Submitted: {display_number(applications_submitted)}")
-    st.caption(f"Cost / Application Submitted: {display_cost(row, 'cost_per_application_submitted', applications_submitted)}")
-    st.caption(f"Career Clicks per Application: {display_ratio(career_clicks, applications_submitted)}")
-
-
-def display_share(numerator, denominator):
-    if denominator is None or pd.isna(denominator) or denominator <= 0:
-        return "—"
-    if numerator is None or pd.isna(numerator):
-        return "—"
-    return f"{numerator / denominator * 100:,.1f}%"
+RECRUITMENT_METRICS = [
+    {"label": "Career Clicks", "metric": "career_clicks", "kind": "volume", "trailing_benchmark": "trailing_3mo_median_career_clicks", "yoy_benchmark": "prior_year_career_clicks"},
+    {"label": "Applications Submitted", "metric": "applications_submitted", "kind": "volume", "trailing_benchmark": "trailing_3mo_median_applications_submitted", "yoy_benchmark": "prior_year_applications_submitted", "recruitment_caveat": True},
+    {"label": "Priority CPA", "metric": "priority_cpa", "kind": "cost", "denominator": "priority_conversions", "trailing_benchmark": "trailing_3mo_median_priority_cpa", "yoy_benchmark": "prior_year_priority_cpa", "recruitment_caveat": True},
+    {"label": "Cost / Application Submitted", "metric": "cost_per_application_submitted", "kind": "cost", "denominator": "applications_submitted", "trailing_benchmark": "trailing_3mo_median_cost_per_application_submitted", "yoy_benchmark": "prior_year_cost_per_application_submitted", "prior_denominator": "prior_year_applications_submitted", "recruitment_caveat": True},
+]
 
 
 def render_campaign_type_cards(df, objective):
@@ -104,34 +138,35 @@ def render_campaign_type_cards(df, objective):
     if rows.empty:
         st.info(f"No {objective.lower()} benchmark rows are available for this month.")
         return
-    columns = st.columns(min(len(rows), 4))
-    for index, (_, row) in enumerate(rows.sort_values("campaign_type").iterrows()):
-        with columns[index % len(columns)]:
-            st.markdown(f"**{row.get('campaign_type', '')} / {row.get('objective', '')}**")
-            kpi_card("Priority Conversions", display_number(row.get("priority_conversions")))
-            kpi_card("Priority CPA", priority_cpa_display(row.get("priority_cpa"), row.get("priority_conversions")))
-            if objective == "Enrollment":
-                render_enrollment_components(row)
-            else:
-                render_recruitment_components(row)
-            st.caption(f"3Mo Benchmark Status: {row.get('benchmark_status', '-')}")
-            st.caption(f"Priority CPA vs 3Mo Median: {display_percent(row.get('priority_cpa_vs_3mo_median'))}")
-            st.caption(f"YoY Benchmark Status: {row.get('yoy_benchmark_status', '-')}")
-            st.caption(f"Priority CPA YoY: {yoy_percentage_display(row, 'priority_cpa_yoy_pct')}")
-            st.caption(f"Priority Conversions YoY: {yoy_percentage_display(row, 'priority_conversions_yoy_pct')}")
-            note = str(row.get("yoy_benchmark_note", "") or "").strip()
-            if row.get("yoy_benchmark_status") == RECRUITMENT_CAVEAT:
-                st.warning(RECRUITMENT_CAVEAT_MESSAGE)
-            elif note:
-                st.caption(f"YoY note: {note}")
+    specs = ENROLLMENT_METRICS if objective == "Enrollment" else RECRUITMENT_METRICS
+    helper = (
+        "Priority Conversions combine Apply Now clicks and Enrollment Forms. Forms are the stronger downstream action."
+        if objective == "Enrollment"
+        else "Applications Submitted are the priority outcome. Career Clicks are shown as a diagnostic intent signal."
+    )
+    st.caption(helper)
+    for _, row in rows.sort_values("campaign_type").iterrows():
+        st.subheader(f"{row.get('campaign_type', '')} / {row.get('objective', '')}")
+        columns = st.columns(4)
+        for column, spec in zip(columns, specs):
+            with column:
+                render_metric_card(row, spec)
+        notes = [text_or_empty(row.get("benchmark_note")), text_or_empty(row.get("yoy_benchmark_note"))]
+        notes = [note for note in notes if note]
+        if row.get("yoy_benchmark_status") == RECRUITMENT_CAVEAT:
+            notes.insert(0, RECRUITMENT_CAVEAT_MESSAGE)
+        if notes:
+            with st.expander(f"Show notes for {row.get('campaign_type', '')}", expanded=False):
+                for note in dict.fromkeys(notes):
+                    st.write(f"- {note}")
 
 
 def benchmark_takeaways(df):
     bullets = []
     for _, row in df.iterrows():
         label = f"{row.get('campaign_type', '')} / {row.get('objective', '')}"
-        yoy_status = str(row.get("yoy_benchmark_status", "") or "").strip()
-        recent_status = str(row.get("benchmark_status", "") or "").strip()
+        yoy_status = text_or_empty(row.get("yoy_benchmark_status"))
+        recent_status = text_or_empty(row.get("benchmark_status"))
         if yoy_status == RECRUITMENT_CAVEAT:
             bullets.append(RECRUITMENT_CAVEAT_MESSAGE)
         elif row.get("objective") == "Enrollment" and yoy_status == "Better":

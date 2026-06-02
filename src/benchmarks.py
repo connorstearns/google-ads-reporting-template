@@ -16,7 +16,13 @@ BENCHMARK_TABLE_COLUMNS = [
     "priority_cpa", "enrollment_apply_now_clicks", "enrollment_forms",
     "cost_per_enrollment_form", "career_clicks", "applications_submitted",
     "cost_per_application_submitted", "trailing_3mo_median_priority_cpa", "priority_cpa_vs_3mo_median",
+    "trailing_3mo_median_enrollment_apply_now_clicks", "trailing_3mo_median_enrollment_forms",
+    "trailing_3mo_median_career_clicks", "trailing_3mo_median_applications_submitted",
+    "trailing_3mo_median_cost_per_enrollment_form", "trailing_3mo_median_cost_per_application_submitted",
     "prior_year_priority_conversions", "prior_year_priority_cpa",
+    "prior_year_enrollment_apply_now_clicks", "prior_year_enrollment_forms",
+    "prior_year_career_clicks", "prior_year_applications_submitted",
+    "prior_year_cost_per_enrollment_form", "prior_year_cost_per_application_submitted",
     "priority_conversions_yoy_pct", "priority_cpa_yoy_pct", "benchmark_status",
     "yoy_benchmark_status", "benchmark_note", "yoy_benchmark_note",
 ]

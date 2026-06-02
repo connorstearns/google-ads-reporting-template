@@ -110,6 +110,18 @@ COLUMN_ALIASES = {
     "priority_cpa_vs_3mo_median": "priority_cpa_vs_3mo_median",
     "trailing_3mo_median_priority_conversions": "trailing_3mo_median_priority_conversions",
     "priority_conversions_vs_3mo_median": "priority_conversions_vs_3mo_median",
+    "trailing_3mo_median_enrollment_apply_now_clicks": "trailing_3mo_median_enrollment_apply_now_clicks",
+    "trailing_3mo_median_enrollment_forms": "trailing_3mo_median_enrollment_forms",
+    "trailing_3mo_median_career_clicks": "trailing_3mo_median_career_clicks",
+    "trailing_3mo_median_applications_submitted": "trailing_3mo_median_applications_submitted",
+    "trailing_3mo_median_cost_per_enrollment_form": "trailing_3mo_median_cost_per_enrollment_form",
+    "trailing_3mo_median_cost_per_application_submitted": "trailing_3mo_median_cost_per_application_submitted",
+    "prior_year_enrollment_apply_now_clicks": "prior_year_enrollment_apply_now_clicks",
+    "prior_year_enrollment_forms": "prior_year_enrollment_forms",
+    "prior_year_career_clicks": "prior_year_career_clicks",
+    "prior_year_applications_submitted": "prior_year_applications_submitted",
+    "prior_year_cost_per_enrollment_form": "prior_year_cost_per_enrollment_form",
+    "prior_year_cost_per_application_submitted": "prior_year_cost_per_application_submitted",
 }
 
 
@@ -146,6 +158,12 @@ PRESERVE_MISSING_NUMERIC_COLUMNS = {
     "clicks_yoy_pct",
     "priority_conversions_yoy_pct",
     "priority_cpa_yoy_pct",
+    "prior_year_enrollment_apply_now_clicks",
+    "prior_year_enrollment_forms",
+    "prior_year_career_clicks",
+    "prior_year_applications_submitted",
+    "prior_year_cost_per_enrollment_form",
+    "prior_year_cost_per_application_submitted",
 }
 
 
@@ -192,7 +210,13 @@ def coerce_types(df):
                 "current_value", "benchmark_value", "variance_pct",
                 "spend_yoy_pct", "clicks_yoy_pct", "priority_conversions_yoy_pct",
                 "priority_cpa_yoy_pct", "priority_cpa_vs_3mo_median",
-                "priority_conversions_vs_3mo_median"]:
+                "priority_conversions_vs_3mo_median",
+                "trailing_3mo_median_enrollment_apply_now_clicks", "trailing_3mo_median_enrollment_forms",
+                "trailing_3mo_median_career_clicks", "trailing_3mo_median_applications_submitted",
+                "trailing_3mo_median_cost_per_enrollment_form", "trailing_3mo_median_cost_per_application_submitted",
+                "prior_year_enrollment_apply_now_clicks", "prior_year_enrollment_forms",
+                "prior_year_career_clicks", "prior_year_applications_submitted",
+                "prior_year_cost_per_enrollment_form", "prior_year_cost_per_application_submitted"]:
         if col in out.columns:
             raw = out[col].astype(str)
             percent_mask = raw.str.contains("%", regex=False)
