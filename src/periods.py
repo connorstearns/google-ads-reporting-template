@@ -63,7 +63,7 @@ def get_comparison_range(start_date, end_date, preset):
     if preset in {"Last 7 days", "Last 30 days", "Custom range"}:
         days = (end - start).days + 1
         comp_end = start - pd.Timedelta(days=1)
-        return comp_end - pd.Timedelta(days=days - 1), comp_end, "WoW" if preset == "Last 7 days" else ("Previous 30D" if preset == "Last 30 days" else "Previous Period")
+        return comp_end - pd.Timedelta(days=days - 1), comp_end, "WoW" if preset == "Last 7 days" else ("Previous 30D" if preset == "Last 30 days" else "Prior Period")
     if preset == "Last week":
         return start - pd.Timedelta(days=7), end - pd.Timedelta(days=7), "WoW"
     if preset == "Last month":
@@ -84,7 +84,7 @@ def get_comparison_range(start_date, end_date, preset):
         return comp_start, comp_start + pd.Timedelta(days=days), "Prior QTD"
     if preset == "Year to date":
         return (start - pd.DateOffset(years=1)).normalize(), (end - pd.DateOffset(years=1)).normalize(), "YoY"
-    return None, None, "Previous Period"
+    return None, None, "Prior Period"
 
 
 def calculate_period_metrics(df, start_date, end_date, filters=None):

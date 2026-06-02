@@ -7,12 +7,11 @@ from src.benchmarks import (
     latest_complete_benchmarks,
     recruitment_caveat_present,
 )
-from src.benchmark_cards import render_metric_grid
 from src.formatting import apply_page_style
 from src.google_sheets import clear_data_cache, load_workbook
 from src.transforms import combine_primary_data
 from src.filters import multiselect_if_available, show_validation
-from src.metrics import summarize, share_columns
+from src.metrics import summarize
 from src.periods import (
     DATE_PRESETS,
     calculate_metric_delta,
@@ -22,9 +21,7 @@ from src.periods import (
     get_date_range_from_preset,
     metric_direction,
 )
-from src.formatting import PRIORITY_CONVERSIONS_HELP, money, number, percent, render_data_source_debug
-from src.charts import spend_vs_conversions_bar_line, objective_mix_bar, top_n_bar
-from src.tables import render_table
+from src.formatting import money, number, render_data_source_debug
 
 
 ACCOUNT_CARDS = [
@@ -33,24 +30,16 @@ ACCOUNT_CARDS = [
     ("Clicks", "clicks", "number", None),
     ("CTR", "ctr", "percent", None),
     ("CPC", "cpc", "money2", "clicks"),
-    ("Total Conversions", "total_conversions", "number1", None),
-    ("CPA", "cpa", "money", "total_conversions"),
-    ("Priority Conversions", "priority_conversions", "number1", None),
-    ("Priority CPA", "priority_cpa", "money", "priority_conversions"),
 ]
 ENROLLMENT_CARDS = [
     ("Enrollment Apply Now Clicks", "enrollment_apply_now_clicks", "number1", None),
     ("Enrollment Forms", "enrollment_forms", "number1", None),
-    ("Priority Conversions", "enrollment_priority_conversions", "number1", None),
-    ("Priority CPA", "priority_cpa", "money", "enrollment_priority_conversions"),
     ("Cost / Enrollment Form", "cost_per_enrollment_form", "money", "enrollment_forms"),
     ("Form Share of Priority", "form_share_of_priority", "percent", "enrollment_priority_conversions"),
 ]
 RECRUITMENT_CARDS = [
     ("Career Clicks", "career_clicks", "number1", None),
     ("Applications Submitted", "applications_submitted", "number1", None),
-    ("Priority Conversions", "recruitment_priority_conversions", "number1", None),
-    ("Priority CPA", "priority_cpa", "money", "recruitment_priority_conversions"),
     ("Cost / Application Submitted", "cost_per_application_submitted", "money", "applications_submitted"),
     ("Career Clicks per Application", "career_clicks_per_application", "ratio", "applications_submitted"),
 ]
@@ -128,11 +117,148 @@ def render_period_cards(title, current_metrics, comparison_metrics, card_specs, 
                 format_value(current_metrics, metric, kind, denominator),
                 delta=delta_text,
                 delta_color=delta_color,
-                help=PRIORITY_CONVERSIONS_HELP if metric in {"priority_conversions", "priority_cpa"} else None,
             )
             st.caption(f"{comparison_label}: {format_value(comparison_metrics, metric, kind, denominator)}")
             if helper:
                 st.caption(helper)
+
+
+def is_material(delta, threshold=0.1):
+    return delta is not None and not pd.isna(delta) and abs(delta) >= threshold
+
+
+def callout_delta(current, comparison, metric, label, comparison_label, improved_text, worsened_text):
+    delta = calculate_metric_delta(current, comparison, metric_direction(metric))
+    if not is_material(delta):
+        return None
+    direction = metric_direction(metric)
+    improved = delta < 0 if direction == "lower" else delta > 0
+    direction_text = improved_text if improved else worsened_text
+    return f"{label} {direction_text} ({delta * 100:+,.1f}% {comparison_label})."
+
+
+def build_executive_callouts(current, comparison, enrollment_current, enrollment_comparison, recruitment_current, recruitment_comparison, comparison_label):
+    candidates = [
+        callout_delta(current.get("spend"), comparison.get("spend"), "spend", "Spend", comparison_label, "increased materially", "decreased materially"),
+        callout_delta(current.get("cpc"), comparison.get("cpc"), "cpc", "CPC", comparison_label, "improved", "worsened"),
+        callout_delta(enrollment_current.get("enrollment_forms"), enrollment_comparison.get("enrollment_forms"), "enrollment_forms", "Enrollment Forms", comparison_label, "increased", "decreased"),
+        callout_delta(enrollment_current.get("cost_per_enrollment_form"), enrollment_comparison.get("cost_per_enrollment_form"), "cost_per_enrollment_form", "Cost / Enrollment Form", comparison_label, "improved", "worsened"),
+        callout_delta(recruitment_current.get("applications_submitted"), recruitment_comparison.get("applications_submitted"), "applications_submitted", "Applications Submitted", comparison_label, "increased", "decreased"),
+        callout_delta(recruitment_current.get("cost_per_application_submitted"), recruitment_comparison.get("cost_per_application_submitted"), "cost_per_application_submitted", "Cost / Application Submitted", comparison_label, "improved", "worsened"),
+    ]
+    if recruitment_current.get("career_clicks", 0) >= 10 and recruitment_current.get("applications_submitted", 0) <= 1:
+        candidates.append("Career Clicks are high but Applications Submitted are weak, suggesting possible recruitment funnel drop-off.")
+    return [item for item in candidates if item][:5]
+
+
+def render_executive_callouts(current, comparison, enrollment_current, enrollment_comparison, recruitment_current, recruitment_comparison, comparison_label):
+    st.subheader("Executive Callouts")
+    callouts = build_executive_callouts(current, comparison, enrollment_current, enrollment_comparison, recruitment_current, recruitment_comparison, comparison_label)
+    if not callouts:
+        st.info("No major period-over-period callouts for the selected period.")
+        return
+    for item in callouts:
+        st.write(f"- {item}")
+
+
+def benchmark_value(row, metric):
+    value = row.get(metric)
+    if value is None or pd.isna(value):
+        return "—"
+    return f"{value * 100:+,.1f}%" if "pct" in metric or "vs_3mo" in metric else number(value, 1)
+
+
+def render_compact_benchmark_snapshot(latest):
+    st.caption("Latest complete benchmark month. These are benchmark deltas, separate from the period-over-period KPI deltas above.")
+    targets = [
+        ("Nonbrand Search", "Enrollment", [
+            ("Enrollment Forms vs 3Mo", "enrollment_forms_vs_3mo_median"),
+            ("Cost / Enrollment Form vs 3Mo", "cost_per_enrollment_form_vs_3mo_median"),
+            ("Enrollment Forms YoY", "enrollment_forms_yoy_pct"),
+            ("Cost / Enrollment Form YoY", "cost_per_enrollment_form_yoy_pct"),
+        ]),
+        ("Nonbrand Search", "Recruitment", [
+            ("Applications Submitted vs 3Mo", "applications_submitted_vs_3mo_median"),
+            ("Cost / Application Submitted vs 3Mo", "cost_per_application_submitted_vs_3mo_median"),
+        ]),
+    ]
+    if latest["campaign_type"].astype(str).str.casefold().eq("performance max").any():
+        targets += [
+            ("Performance Max", "Enrollment", [
+                ("Enrollment Forms vs 3Mo", "enrollment_forms_vs_3mo_median"),
+                ("Cost / Enrollment Form vs 3Mo", "cost_per_enrollment_form_vs_3mo_median"),
+                ("Enrollment Forms YoY", "enrollment_forms_yoy_pct"),
+                ("Cost / Enrollment Form YoY", "cost_per_enrollment_form_yoy_pct"),
+            ]),
+            ("Performance Max", "Recruitment", [
+                ("Applications Submitted vs 3Mo", "applications_submitted_vs_3mo_median"),
+                ("Cost / Application Submitted vs 3Mo", "cost_per_application_submitted_vs_3mo_median"),
+            ]),
+        ]
+    for campaign_type, objective, metrics in targets:
+        matched = latest[
+            latest["campaign_type"].astype(str).str.casefold().eq(campaign_type.casefold())
+            & latest["objective"].astype(str).str.casefold().eq(objective.casefold())
+        ]
+        if matched.empty:
+            continue
+        row = matched.iloc[0]
+        st.markdown(f"**{campaign_type} / {objective}**")
+        cols = st.columns(len(metrics))
+        for col, (label, metric) in zip(cols, metrics):
+            with col:
+                st.metric(label, benchmark_value(row, metric))
+        if objective == "Recruitment" and row.get("yoy_benchmark_status") == RECRUITMENT_CAVEAT:
+            st.warning("Recruitment YoY tracking caveat: Applications Submitted was not consistently tracked before July 2025.")
+
+
+def summarize_campaigns(df):
+    if df.empty:
+        return pd.DataFrame()
+    return summarize(df, ["objective", "campaign"]).sort_values("spend", ascending=False)
+
+
+def build_campaign_watchouts(df):
+    summary = summarize_campaigns(df)
+    if summary.empty:
+        return []
+    watchouts = []
+    top_spend = summary.iloc[0]
+    watchouts.append(("Highest spend campaign", top_spend["campaign"], money(top_spend["spend"])))
+    enrollment = summary[summary["objective"].eq("Enrollment")].copy()
+    if not enrollment.empty:
+        best_forms = enrollment[enrollment["enrollment_forms"] > 0].sort_values("cost_per_enrollment_form").head(1)
+        if not best_forms.empty:
+            row = best_forms.iloc[0]
+            watchouts.append(("Best cost / Enrollment Form", row["campaign"], money(row["cost_per_enrollment_form"])))
+    recruitment = summary[summary["objective"].eq("Recruitment")].copy()
+    if not recruitment.empty:
+        best_apps = recruitment[recruitment["applications_submitted"] > 0].sort_values("cost_per_application_submitted").head(1)
+        if not best_apps.empty:
+            row = best_apps.iloc[0]
+            watchouts.append(("Best cost / Application Submitted", row["campaign"], money(row["cost_per_application_submitted"])))
+    weak = summary[(summary["spend"] > 0) & (summary["enrollment_forms"].fillna(0) + summary["applications_submitted"].fillna(0) == 0)].head(1)
+    if not weak.empty:
+        row = weak.iloc[0]
+        watchouts.append(("High spend, low downstream outcomes", row["campaign"], money(row["spend"])))
+    weak_clicks = summary[(summary["clicks"] >= 20) & (summary["enrollment_forms"].fillna(0) + summary["applications_submitted"].fillna(0) == 0)].sort_values("clicks", ascending=False).head(1)
+    if not weak_clicks.empty:
+        row = weak_clicks.iloc[0]
+        watchouts.append(("Clicks with weak form/application volume", row["campaign"], number(row["clicks"])))
+    return watchouts[:5]
+
+
+def render_campaign_watchouts(df):
+    st.subheader("Campaign Watchouts")
+    watchouts = build_campaign_watchouts(df)
+    if not watchouts:
+        st.info("No campaign watchouts for the selected period.")
+        return
+    cols = st.columns(min(len(watchouts), 3))
+    for index, (label, campaign_name, value) in enumerate(watchouts):
+        with cols[index % len(cols)]:
+            st.metric(label, value)
+            st.caption(campaign_name)
 
 
 st.set_page_config(page_title="HCZ Google Ads Dashboard", layout="wide")
@@ -167,50 +293,11 @@ recruitment_current = calculate_period_metrics(campaign[campaign["objective"].eq
 recruitment_comparison = calculate_period_metrics(campaign[campaign["objective"].eq("Recruitment")], comp_start, comp_end, filters)
 
 render_period_cards("Account Overview", current_metrics, comparison_metrics, ACCOUNT_CARDS, comparison_label, columns=3)
+render_executive_callouts(current_metrics, comparison_metrics, enrollment_current, enrollment_comparison, recruitment_current, recruitment_comparison, comparison_label)
 render_period_cards("Enrollment Performance", enrollment_current, enrollment_comparison, ENROLLMENT_CARDS, comparison_label, columns=3)
 render_period_cards("Recruitment Performance", recruitment_current, recruitment_comparison, RECRUITMENT_CARDS, comparison_label, columns=3)
 
-st.plotly_chart(spend_vs_conversions_bar_line(current_campaign), use_container_width=True)
-
-left, right = st.columns(2)
-with left:
-    st.plotly_chart(objective_mix_bar(current_campaign, "spend", "Spend by objective"), use_container_width=True)
-with right:
-    st.plotly_chart(objective_mix_bar(current_campaign, "priority_conversions", "Priority conversions by objective"), use_container_width=True)
-
-objective = share_columns(summarize(current_campaign, ["objective"])).sort_values("spend", ascending=False)
-campaign_summary = summarize(current_campaign, ["objective", "campaign"]).sort_values("spend", ascending=False)
-
-st.subheader("What to look at")
-notes = []
-if not campaign_summary.empty:
-    top = campaign_summary.iloc[0]
-    spend_share = top.spend / campaign_summary.spend.sum() if campaign_summary.spend.sum() else 0
-    notes.append(f"Spend is concentrated in {top.campaign}, which accounts for {percent(spend_share)} of filtered spend.")
-if "Enrollment" in objective.get("objective", []).values:
-    enroll = objective[objective.objective.eq("Enrollment")].iloc[0]
-    notes.append(f"Enrollment accounts for {percent(enroll.priority_conversions_share)} of priority conversions.")
-zero_priority = campaign_summary[(campaign_summary.spend > 0) & (campaign_summary.priority_conversions == 0)]
-if not zero_priority.empty:
-    notes.append(f"{len(zero_priority)} campaigns have spend but no priority conversions.")
-if not current_search.empty and "objective" in current_search.columns:
-    unmapped_spend = current_search.loc[current_search.objective.eq("Other / Unmapped"), "spend"].sum()
-    total_spend = current_search["spend"].sum()
-    notes.append(f"{percent(unmapped_spend / total_spend if total_spend else 0)} of search term spend is currently unmapped.")
-for note in notes or ["Load more model data to populate automated diagnostic readouts."]:
-    st.write(f"- {note}")
-
-col1, col2 = st.columns(2)
-with col1:
-    st.plotly_chart(top_n_bar(current_campaign, "campaign", "spend", 10, "Top campaigns by spend"), use_container_width=True)
-with col2:
-    st.plotly_chart(top_n_bar(current_campaign, "campaign", "priority_conversions", 10, "Top campaigns by priority conversions"), use_container_width=True)
-
-render_table(objective, "Objective split", "Spend, traffic, and efficiency by objective.", key="objective_split")
-render_table(campaign_summary.head(50), "Campaign diagnostics", "Top campaign rows sorted by spend.", key="campaign_diagnostics")
-
 st.subheader("Performance vs Benchmarks")
-st.caption("Benchmark cards use the latest complete month to avoid comparing partial current-month data against full historical periods.")
 benchmarks = get_campaign_type_benchmarks(data)
 latest, benchmark_month_used, used_incomplete_fallback = latest_complete_benchmarks(benchmarks)
 if latest.empty:
@@ -219,26 +306,14 @@ else:
     if used_incomplete_fallback:
         st.warning("No complete benchmark month is available. Benchmark cards are using the latest available month, which may be partial.")
     st.caption(f"Benchmark month: {benchmark_month_used:%b %Y}")
-    preferred_cards = [("Nonbrand Search", "Enrollment"), ("Nonbrand Search", "Recruitment")]
-    if st.checkbox("Show Performance Max benchmark cards", value=False):
-        preferred_cards += [("Performance Max", "Enrollment"), ("Performance Max", "Recruitment")]
-    rendered = False
-    for campaign_type, objective_name in preferred_cards:
-        matched = latest[
-            latest["campaign_type"].astype(str).str.casefold().eq(campaign_type.casefold())
-            & latest["objective"].astype(str).str.casefold().eq(objective_name.casefold())
-        ]
-        if not matched.empty:
-            rendered = True
-            st.markdown(f"**{campaign_type} / {objective_name}**")
-            render_metric_grid(matched.iloc[0], objective_name)
-    if not rendered:
-        st.info("The latest benchmark month does not include the featured campaign type and objective combinations.")
+    render_compact_benchmark_snapshot(latest)
     if recruitment_caveat_present(latest):
         st.warning(
             f"{RECRUITMENT_CAVEAT}: Applications Submitted was not consistently tracked before July 2025, "
             "so Recruitment YoY priority-conversion comparisons should be treated cautiously."
         )
+
+render_campaign_watchouts(current_campaign)
 
 with st.expander("Data Source Debug", expanded=False):
     render_data_source_debug(current_campaign)
