@@ -4,7 +4,19 @@ from .google_sheets import clear_data_cache
 from .config import DEFAULT_THRESHOLDS
 
 
+def render_page_navigation():
+    st.sidebar.page_link("app.py", label="Executive Summary")
+    st.sidebar.page_link("pages/2_Objective_Overview.py", label="Objective Overview")
+    st.sidebar.page_link("pages/3_Campaign_Performance.py", label="Campaign Performance")
+    st.sidebar.page_link("pages/4_Search_Term_Analysis.py", label="Search Term Analysis")
+    st.sidebar.page_link("pages/5_Landing_Page_Analysis.py", label="Landing Page Analysis")
+    st.sidebar.page_link("pages/6_Review_Queue.py", label="Review Queue")
+    st.sidebar.page_link("pages/7_Benchmarking.py", label="Benchmarking")
+    st.sidebar.divider()
+
+
 def render_sidebar(dataframes, validation=None, thresholds=False):
+    render_page_navigation()
     st.sidebar.header("Filters")
     if st.sidebar.button("Refresh data", use_container_width=True):
         clear_data_cache()

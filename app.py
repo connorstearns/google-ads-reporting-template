@@ -10,7 +10,7 @@ from src.benchmarks import (
 from src.formatting import apply_page_style
 from src.google_sheets import clear_data_cache, load_workbook
 from src.transforms import combine_primary_data
-from src.filters import multiselect_if_available, show_validation
+from src.filters import multiselect_if_available, render_page_navigation, show_validation
 from src.metrics import summarize
 from src.periods import (
     DATE_PRESETS,
@@ -46,6 +46,7 @@ RECRUITMENT_CARDS = [
 
 
 def render_executive_sidebar(campaign, validation):
+    render_page_navigation()
     st.sidebar.header("Filters")
     if st.sidebar.button("Refresh data", use_container_width=True):
         clear_data_cache()
