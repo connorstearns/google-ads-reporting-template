@@ -9,6 +9,7 @@ COLUMN_ALIASES = {
     "campaign_id": "campaign_id",
     "campaign_status": "campaign_status",
     "campaign_role": "campaign_role",
+    "campaign_type": "campaign_type",
     "funnel_stage": "funnel_stage",
     "ad_group_name": "ad_group",
     "ad_group": "ad_group",
@@ -93,6 +94,22 @@ COLUMN_ALIASES = {
     "match_type": "match_type",
     "search_term_category": "search_term_category",
     "page_group": "page_group",
+    "benchmark_status": "benchmark_status",
+    "benchmark_note": "benchmark_note",
+    "yoy_benchmark_status": "yoy_benchmark_status",
+    "yoy_benchmark_note": "yoy_benchmark_note",
+    "prior_year_spend": "prior_year_spend",
+    "prior_year_clicks": "prior_year_clicks",
+    "prior_year_priority_conversions": "prior_year_priority_conversions",
+    "prior_year_priority_cpa": "prior_year_priority_cpa",
+    "spend_yoy_pct": "spend_yoy_pct",
+    "clicks_yoy_pct": "clicks_yoy_pct",
+    "priority_conversions_yoy_pct": "priority_conversions_yoy_pct",
+    "priority_cpa_yoy_pct": "priority_cpa_yoy_pct",
+    "trailing_3mo_median_priority_cpa": "trailing_3mo_median_priority_cpa",
+    "priority_cpa_vs_3mo_median": "priority_cpa_vs_3mo_median",
+    "trailing_3mo_median_priority_conversions": "trailing_3mo_median_priority_conversions",
+    "priority_conversions_vs_3mo_median": "priority_conversions_vs_3mo_median",
 }
 
 
@@ -101,6 +118,7 @@ REQUIRED_COLUMNS = {
     "objective_performance": {"spend", "impressions", "clicks", "conversions"},
     "search_terms": {"search_term", "campaign", "spend", "impressions", "clicks", "conversions"},
     "landing_pages": {"final_url", "campaign", "spend", "impressions", "clicks", "conversions"},
+    "campaign_type_benchmarks": {"month", "campaign_type", "objective"},
 }
 
 
@@ -148,6 +166,8 @@ def coerce_types(df):
     out = df.copy()
     if "date" in out.columns:
         out["date"] = pd.to_datetime(out["date"], errors="coerce")
+    if "month" in out.columns:
+        out["month"] = pd.to_datetime(out["month"], errors="coerce")
     for col in ["spend", "impressions", "clicks", "conversions", "reported_conversions", "all_conversions",
                 "ctr", "cpc", "cvr", "cpa",
                 "reported_cpa", "total_conversions", "priority_conversions",
@@ -155,15 +175,24 @@ def coerce_types(df):
                 "applications_submitted", "enrollment_apply_now_clicks", "enrollment_apply_clicks", "enrollment_forms",
                 "primary_mapped_conversions", "micro_mapped_conversions", "cost_per_enrollment_apply_click",
                 "cost_per_enrollment_form", "cost_per_career_click", "cost_per_application_submitted",
-                "review_priority_score"]:
+                "review_priority_score", "prior_year_spend", "prior_year_clicks",
+                "prior_year_priority_conversions", "prior_year_priority_cpa",
+                "trailing_3mo_median_priority_cpa", "trailing_3mo_median_priority_conversions",
+                "current_value", "benchmark_value", "variance_pct",
+                "spend_yoy_pct", "clicks_yoy_pct", "priority_conversions_yoy_pct",
+                "priority_cpa_yoy_pct", "priority_cpa_vs_3mo_median",
+                "priority_conversions_vs_3mo_median"]:
         if col in out.columns:
+            raw = out[col].astype(str)
+            percent_mask = raw.str.contains("%", regex=False)
             out[col] = (
-                out[col].astype(str)
+                raw
                 .str.replace("$", "", regex=False)
                 .str.replace(",", "", regex=False)
                 .str.replace("%", "", regex=False)
             )
             out[col] = pd.to_numeric(out[col], errors="coerce").fillna(0)
+            out.loc[percent_mask, col] = out.loc[percent_mask, col] / 100
     return out
 
 

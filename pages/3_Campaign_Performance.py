@@ -1,6 +1,7 @@
 import pandas as pd
 import streamlit as st
 
+from src.benchmarks import UNAVAILABLE_MESSAGE, build_campaign_type_context, get_campaign_type_benchmarks
 from src.campaign_decisions import build_campaign_decisions, missing_optional_campaign_fields
 from src.charts import (
     campaign_conversion_mix_bar,
@@ -25,6 +26,12 @@ DECISION_COLUMNS = [
     "reported_conversions", "all_conversions", "priority_conversions", "priority_cpa",
     "enrollment_apply_now_clicks", "enrollment_forms", "career_clicks", "applications_submitted",
     "micro_conversions", "primary_issue", "recommended_action", "status",
+]
+BENCHMARK_CONTEXT_COLUMNS = [
+    "month", "campaign_type", "objective", "campaign", "spend", "priority_conversions",
+    "benchmark_status", "yoy_benchmark_status", "campaign_type_priority_cpa_benchmark",
+    "prior_year_priority_cpa", "priority_cpa_vs_3mo_benchmark", "priority_cpa_yoy_pct",
+    "yoy_benchmark_note",
 ]
 
 
@@ -66,6 +73,7 @@ thresholds = filters["thresholds"]
 campaign_level = build_campaign_decisions(campaign, thresholds, include_ad_group=False)
 decision_table = build_campaign_decisions(campaign, thresholds, include_ad_group=True)
 totals = summarize(campaign).iloc[0]
+benchmarks = get_campaign_type_benchmarks(data)
 
 cols = st.columns(6)
 with cols[0]: kpi_card("Total spend", money(totals["spend"]))
@@ -74,6 +82,23 @@ with cols[2]: kpi_card("Priority CPA", money(totals["priority_cpa"]), help_text=
 with cols[3]: kpi_card("Campaigns to investigate", number((campaign_level["status"] == "Investigate").sum()))
 with cols[4]: kpi_card("Campaigns to optimize", number((campaign_level["status"] == "Optimize").sum()))
 with cols[5]: kpi_card("Campaigns eligible to scale", number((campaign_level["status"] == "Scale").sum()))
+
+st.subheader("Campaign Type Benchmark")
+st.caption("Campaign rows joined to Sheet-provided benchmark context by month, campaign type, and objective. These are campaign-type benchmarks, not campaign-specific benchmarks.")
+benchmark_context = build_campaign_type_context(campaign, benchmarks)
+if benchmarks.empty:
+    st.info(UNAVAILABLE_MESSAGE)
+elif benchmark_context.empty:
+    st.info("Campaign Type Benchmark context is unavailable because campaign rows do not include campaign type and month fields.")
+else:
+    render_table(
+        benchmark_context,
+        "Campaign Type Benchmark Context",
+        "Use this context alongside campaign-level diagnostics; the benchmark values apply to the campaign type and objective grouping.",
+        sort_by=None,
+        key="campaign_type_benchmark_context",
+        display_columns=BENCHMARK_CONTEXT_COLUMNS,
+    )
 
 st.subheader("Recommended campaign actions")
 st.caption("Prioritized, rule-based actions. Mapping and investigation work surfaces before budget expansion.")

@@ -16,9 +16,11 @@ EXPECTED_MODEL_TABS = {
     "budget_targets": "map_budget_targets",
     "mapping_gaps": "qa_mapping_gaps",
     "dashboard_validation": "qa_dashboard_validation",
+    "campaign_type_benchmarks": "model_benchmarks_campaign_type",
+    "benchmark_flags": "model_benchmark_flags",
 }
 
-OPTIONAL_MODEL_TABS = {"conversion_rollup"}
+OPTIONAL_MODEL_TABS = {"conversion_rollup", "benchmark_flags"}
 
 TAB_ALIASES = {
     "campaign_performance": [
@@ -72,6 +74,8 @@ TAB_ALIASES = {
     "budget_targets": ["map_budget_targets"],
     "mapping_gaps": ["qa_mapping_gaps"],
     "dashboard_validation": ["qa_dashboard_validation"],
+    "campaign_type_benchmarks": ["model_benchmarks_campaign_type"],
+    "benchmark_flags": ["model_benchmark_flags"],
 }
 
 TAB_CANDIDATES = TAB_ALIASES

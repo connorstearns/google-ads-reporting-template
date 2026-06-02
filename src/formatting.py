@@ -62,6 +62,10 @@ def metric_column_config():
         "cpc": st.column_config.NumberColumn("CPC", format="$%.2f"),
         "cpa": st.column_config.NumberColumn("CPA", format="$%.0f"),
         "priority_cpa": st.column_config.NumberColumn("Priority CPA", format="$%.0f"),
+        "campaign_type_priority_cpa_benchmark": st.column_config.NumberColumn("Campaign Type Priority CPA Benchmark", format="$%.0f"),
+        "prior_year_priority_cpa": st.column_config.NumberColumn("Prior Year Priority CPA", format="$%.0f"),
+        "trailing_3mo_median_priority_cpa": st.column_config.NumberColumn("Trailing 3Mo Median Priority CPA", format="$%.0f"),
+        "trailing_3mo_median_priority_conversions": st.column_config.NumberColumn("Trailing 3Mo Median Priority Conversions", format="%.1f"),
         "cost_per_enrollment_apply_click": st.column_config.NumberColumn("Cost per Apply Now Click", format="$%.0f"),
         "cost_per_enrollment_form": st.column_config.NumberColumn("Cost per Enrollment Form", format="$%.0f"),
         "cost_per_application_submitted": st.column_config.NumberColumn("Cost per Application Submitted", format="$%.0f"),
@@ -86,6 +90,14 @@ def metric_column_config():
         "micro_conversions": st.column_config.NumberColumn("Micro Conversions", format="%.1f"),
         "all_to_reported_conversion_ratio": st.column_config.NumberColumn("All / Reported Conversion Ratio", format="%.2f"),
         "priority_score": st.column_config.NumberColumn("Priority Score", format="%d"),
+        "spend_yoy_pct": st.column_config.NumberColumn("Spend YoY %", format="%.1f%%"),
+        "clicks_yoy_pct": st.column_config.NumberColumn("Clicks YoY %", format="%.1f%%"),
+        "priority_conversions_yoy_pct": st.column_config.NumberColumn("Priority Conversions YoY %", format="%.1f%%"),
+        "priority_cpa_yoy_pct": st.column_config.NumberColumn("Priority CPA YoY %", format="%.1f%%"),
+        "priority_cpa_vs_3mo_median": st.column_config.NumberColumn("Priority CPA vs 3Mo Median", format="%.1f%%"),
+        "priority_cpa_vs_3mo_benchmark": st.column_config.NumberColumn("Priority CPA vs 3Mo Benchmark", format="%.1f%%"),
+        "priority_conversions_vs_3mo_median": st.column_config.NumberColumn("Priority Conversions vs 3Mo Median", format="%.1f%%"),
+        "variance_pct": st.column_config.NumberColumn("Variance %", format="%.1f%%"),
     }
 
 

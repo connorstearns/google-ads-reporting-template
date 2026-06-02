@@ -1,4 +1,11 @@
 import streamlit as st
+from src.benchmarks import (
+    RECRUITMENT_CAVEAT,
+    UNAVAILABLE_MESSAGE,
+    get_campaign_type_benchmarks,
+    latest_benchmarks,
+    recruitment_caveat_present,
+)
 from src.formatting import apply_page_style
 from src.google_sheets import load_workbook
 from src.transforms import combine_primary_data
@@ -90,6 +97,56 @@ with col2:
 
 render_table(objective, "Objective split", "Spend, traffic, and efficiency by objective.", key="objective_split")
 render_table(campaign_summary.head(50), "Campaign diagnostics", "Top campaign rows sorted by spend.", key="campaign_diagnostics")
+
+st.subheader("Performance vs Benchmarks")
+benchmarks = get_campaign_type_benchmarks(data)
+latest = latest_benchmarks(benchmarks)
+if latest.empty:
+    st.info(UNAVAILABLE_MESSAGE)
+else:
+    preferred_cards = [
+        ("Nonbrand Search", "Enrollment"),
+        ("Nonbrand Search", "Recruitment"),
+        ("Performance Max", "Enrollment"),
+        ("Performance Max", "Recruitment"),
+    ]
+    card_rows = []
+    for campaign_type, objective_name in preferred_cards:
+        matched = latest[
+            latest["campaign_type"].astype(str).str.casefold().eq(campaign_type.casefold())
+            & latest["objective"].astype(str).str.casefold().eq(objective_name.casefold())
+        ]
+        if not matched.empty:
+            card_rows.append(matched.iloc[0])
+    if card_rows:
+        cols = st.columns(len(card_rows))
+        for col, benchmark in zip(cols, card_rows):
+            with col:
+                st.markdown(f"**{benchmark['campaign_type']} / {benchmark['objective']}**")
+                kpi_card("Priority CPA", money(benchmark.get("priority_cpa")))
+                st.caption(f"3Mo Benchmark Status: {benchmark.get('benchmark_status', '-')}")
+                st.caption(f"YoY Benchmark Status: {benchmark.get('yoy_benchmark_status', '-')}")
+                st.caption(f"Priority CPA YoY: {signed_percent(benchmark.get('priority_cpa_yoy_pct')) or '-'}")
+                st.caption(f"Priority Conversions YoY: {signed_percent(benchmark.get('priority_conversions_yoy_pct')) or '-'}")
+    else:
+        st.info("The latest benchmark month does not include the featured campaign type and objective combinations.")
+    if recruitment_caveat_present(latest):
+        st.warning(
+            f"{RECRUITMENT_CAVEAT}: Applications Submitted was not consistently tracked before July 2025, "
+            "so Recruitment YoY priority-conversion comparisons should be treated cautiously."
+        )
+    takeaway_columns = [
+        "campaign_type", "objective", "benchmark_status", "yoy_benchmark_status",
+        "priority_cpa", "prior_year_priority_cpa", "yoy_benchmark_note",
+    ]
+    render_table(
+        latest,
+        "Biggest Benchmark Takeaways",
+        "Latest campaign-type benchmark readout from the Google Sheet.",
+        sort_by=None,
+        key="executive_benchmark_takeaways",
+        display_columns=takeaway_columns,
+    )
 
 with st.expander("Data Source Debug", expanded=False):
     render_data_source_debug(campaign)

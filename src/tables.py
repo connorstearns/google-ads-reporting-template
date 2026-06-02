@@ -43,7 +43,12 @@ def render_table(df, title, caption="", sort_by="spend", search_cols=None, key=N
     if sort_by in shown.columns:
         shown = shown.sort_values(sort_by, ascending=False)
     shown = shown[[c for c in (display_columns or ordered_columns(shown)) if c in shown.columns]]
-    for pct_col in ["ctr", "cvr", "spend_share", "click_share", "conversion_share"]:
+    for pct_col in [
+        "ctr", "cvr", "spend_share", "click_share", "conversion_share", "spend_yoy_pct",
+        "clicks_yoy_pct", "priority_conversions_yoy_pct", "priority_cpa_yoy_pct",
+        "priority_cpa_vs_3mo_median", "priority_cpa_vs_3mo_benchmark",
+        "priority_conversions_vs_3mo_median", "variance_pct",
+    ]:
         if pct_col in shown.columns:
             shown[pct_col] = shown[pct_col] * 100
     st.dataframe(shown, use_container_width=True, hide_index=True, column_config=metric_column_config())

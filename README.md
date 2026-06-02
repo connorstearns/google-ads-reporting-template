@@ -73,6 +73,8 @@ The app resolves logical datasets to the first available preferred or alias tab.
 - `budget_targets`: `map_budget_targets`
 - `mapping_gaps`: `qa_mapping_gaps`
 - `dashboard_validation`: `qa_dashboard_validation`
+- `campaign_type_benchmarks`: `model_benchmarks_campaign_type`
+- `benchmark_flags` optional: `model_benchmark_flags`
 
 Raw Supermetrics tabs are not required. Add cleaned model tabs whenever possible so page logic remains stable.
 
