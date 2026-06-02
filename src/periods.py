@@ -105,6 +105,27 @@ def calculate_period_metrics(df, start_date, end_date, filters=None):
     return _derive_section_metrics(row)
 
 
+def top_kpi_deltas(df, filters, metrics):
+    if df.empty or "date" not in df.columns or not filters.get("date_range"):
+        return {}
+    dates = filters.get("date_range")
+    if len(dates) != 2:
+        return {}
+    start = pd.Timestamp(dates[0]).normalize()
+    end = pd.Timestamp(dates[1]).normalize()
+    days = (end - start).days + 1
+    comp_end = start - pd.Timedelta(days=1)
+    comp_start = comp_end - pd.Timedelta(days=days - 1)
+    current = calculate_period_metrics(df, start, end, filters)
+    comparison = calculate_period_metrics(df, comp_start, comp_end, filters)
+    deltas = {}
+    for metric in metrics:
+        delta = calculate_metric_delta(current.get(metric), comparison.get(metric), metric_direction(metric))
+        text, _, _ = format_delta(delta, "prior period", metric_direction(metric))
+        deltas[metric] = text
+    return deltas
+
+
 def calculate_metric_delta(current_value, comparison_value, metric_direction):
     if comparison_value is None or pd.isna(comparison_value) or comparison_value == 0:
         return None

@@ -2,9 +2,10 @@ import pandas as pd
 import streamlit as st
 
 from src.filters import apply_global_filters, multiselect_if_available, render_sidebar
-from src.formatting import apply_page_style
+from src.formatting import money, number, render_kpi_card, apply_page_style
 from src.google_sheets import load_workbook
 from src.metrics import safe_divide
+from src.periods import top_kpi_deltas
 from src.tables import render_table
 from src.transforms import combine_primary_data
 
@@ -81,6 +82,7 @@ except Exception as exc:
 
 campaign, search, landing = combine_primary_data(data)
 filters = render_sidebar([campaign, search, landing], validation)
+search_source = search.copy()
 search = apply_global_filters(search, filters)
 
 if search.empty or "search_term" not in search.columns:
@@ -98,6 +100,18 @@ for label, column in [
         search = search[search[column].isin(selected)]
 
 search = add_generic_metrics(search)
+top_deltas = top_kpi_deltas(search_source, filters, ["spend", "clicks", "conversions", "cpa"])
+totals = add_generic_metrics(pd.DataFrame([{
+    "spend": search["spend"].sum(),
+    "impressions": search["impressions"].sum(),
+    "clicks": search["clicks"].sum(),
+    "conversions": search["conversions"].sum(),
+}])).iloc[0]
+cols = st.columns(4)
+with cols[0]: render_kpi_card("Spend", money(totals["spend"]), delta=top_deltas.get("spend"))
+with cols[1]: render_kpi_card("Clicks", number(totals["clicks"]), delta=top_deltas.get("clicks"))
+with cols[2]: render_kpi_card("Conversions", number(totals["conversions"], 1), delta=top_deltas.get("conversions"))
+with cols[3]: render_kpi_card("CPA", money(totals["cpa"]), delta=top_deltas.get("cpa"), format_type="cost_efficiency")
 for col in ACTION_QUEUE_COLUMNS:
     if col not in search.columns:
         search[col] = ""

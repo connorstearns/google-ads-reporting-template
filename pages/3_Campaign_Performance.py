@@ -5,9 +5,10 @@ import streamlit as st
 from src.benchmarks import UNAVAILABLE_MESSAGE, build_campaign_type_context, get_campaign_type_benchmarks, priority_cpa_display
 from src.campaign_decisions import missing_optional_campaign_fields
 from src.filters import apply_global_filters, render_sidebar
-from src.formatting import PRIORITY_CONVERSIONS_HELP, apply_page_style, kpi_card, money, number, render_conversion_model_debug, render_data_source_debug
+from src.formatting import PRIORITY_CONVERSIONS_HELP, apply_page_style, kpi_card, money, number, render_conversion_model_debug, render_data_source_debug, render_kpi_card
 from src.google_sheets import load_workbook
-from src.metrics import safe_divide, summarize
+from src.metrics import summarize
+from src.periods import top_kpi_deltas
 from src.tables import render_table
 from src.transforms import combine_primary_data
 
@@ -43,6 +44,17 @@ SEARCH_IS_COLUMNS = [
 ]
 
 
+def safe_div(numerator, denominator):
+    numerator = pd.to_numeric(numerator, errors="coerce")
+    denominator = pd.to_numeric(denominator, errors="coerce")
+    return numerator.div(denominator.replace({0: pd.NA}))
+
+
+def numeric_or_zero(value):
+    value = pd.to_numeric(pd.Series([value]), errors="coerce").iloc[0]
+    return 0 if pd.isna(value) else value
+
+
 def campaign_group_columns(df):
     cols = ["objective", "campaign"]
     for col in ["campaign_type", "campaign_role", "campaign_status", "advertising_channel_type"]:
@@ -72,31 +84,31 @@ def add_action_metrics(df, thresholds):
         out["campaign_status"] = "Unknown"
     micro_primary = out.apply(lambda row: pd.Series(objective_conversion_metrics(row), index=["micro_conversions", "primary_conversions"]), axis=1)
     out[["micro_conversions", "primary_conversions"]] = micro_primary
-    out["conversion_quality_ratio"] = safe_divide(out["priority_conversions"], out["total_conversions"])
+    out["conversion_quality_ratio"] = safe_div(out["priority_conversions"], out["total_conversions"])
     objective_totals = out.groupby("objective", dropna=False).agg(
         objective_spend=("spend", "sum"),
         objective_priority_conversions=("priority_conversions", "sum"),
     ).reset_index()
-    objective_totals["objective_avg_priority_cpa"] = safe_divide(
+    objective_totals["objective_avg_priority_cpa"] = safe_div(
         objective_totals["objective_spend"],
         objective_totals["objective_priority_conversions"],
     )
-    out = out.merge(objective_totals[["objective_avg_priority_cpa"]], on="objective", how="left")
+    out = out.merge(objective_totals[["objective", "objective_avg_priority_cpa"]], on="objective", how="left")
     out["action_status"] = out.apply(lambda row: action_status(row, thresholds), axis=1)
     out["recommended_action"] = out.apply(recommended_action, axis=1)
     return out.sort_values(["action_status", "spend"], ascending=[True, False])
 
 
 def action_status(row, thresholds):
-    spend = row.get("spend", 0)
-    priority_conversions = row.get("priority_conversions", 0)
-    priority_cpa = row.get("priority_cpa", 0)
-    objective_avg = row.get("objective_avg_priority_cpa", 0)
-    total_conversions = row.get("total_conversions", 0)
-    quality_ratio = row.get("conversion_quality_ratio", 0)
+    spend = numeric_or_zero(row.get("spend", 0))
+    priority_conversions = numeric_or_zero(row.get("priority_conversions", 0))
+    priority_cpa = numeric_or_zero(row.get("priority_cpa", 0))
+    objective_avg = numeric_or_zero(row.get("objective_avg_priority_cpa", 0))
+    total_conversions = numeric_or_zero(row.get("total_conversions", 0))
+    quality_ratio = numeric_or_zero(row.get("conversion_quality_ratio", 0))
     if spend < thresholds["min_spend"]:
         return "Needs data"
-    if total_conversions >= priority_conversions + 5 and quality_ratio < 0.5:
+    if total_conversions > priority_conversions * 3 and quality_ratio < 0.25:
         return "Quality issue"
     if spend > 0 and priority_conversions == 0:
         return "Investigate"
@@ -160,9 +172,9 @@ def build_tactic_allocation(action_matrix):
         objective_priority_conversions=("priority_conversions", "sum"),
     ).reset_index()
     grouped = grouped.merge(objective_totals, on="objective", how="left")
-    grouped["spend_share"] = safe_divide(grouped["spend"], grouped["objective_spend"])
-    grouped["priority_conversion_share"] = safe_divide(grouped["priority_conversions"], grouped["objective_priority_conversions"])
-    grouped["efficiency_index"] = safe_divide(grouped["priority_conversion_share"], grouped["spend_share"])
+    grouped["spend_share"] = safe_div(grouped["spend"], grouped["objective_spend"])
+    grouped["priority_conversion_share"] = safe_div(grouped["priority_conversions"], grouped["objective_priority_conversions"])
+    grouped["efficiency_index"] = safe_div(grouped["priority_conversion_share"], grouped["spend_share"])
     grouped["allocation_interpretation"] = grouped["efficiency_index"].apply(efficiency_label)
     return grouped.sort_values(["objective", "efficiency_index", "spend"], ascending=[True, False, False])
 
@@ -257,6 +269,7 @@ except Exception as exc:
 
 campaign, search, landing = combine_primary_data(data)
 filters = render_sidebar([campaign, search, landing], validation, thresholds=True)
+campaign_source = campaign.copy()
 campaign = apply_global_filters(campaign, filters)
 
 if campaign.empty:
@@ -279,6 +292,7 @@ if "ad_group" in campaign.columns:
 
 thresholds = filters["thresholds"]
 totals = summarize(campaign).iloc[0]
+top_deltas = top_kpi_deltas(campaign_source, filters, ["spend", "priority_conversions", "priority_cpa"])
 action_matrix = build_action_matrix(campaign, thresholds)
 tactic_allocation = build_tactic_allocation(action_matrix)
 benchmarks = get_campaign_type_benchmarks(data)
@@ -287,9 +301,9 @@ search_is_ready = impression_share_populated(action_matrix)
 search_market = build_search_market_penetration(action_matrix)
 
 cols = st.columns(7)
-with cols[0]: kpi_card("Total Spend", money(totals["spend"]))
-with cols[1]: kpi_card("Priority Conversions", number(totals["priority_conversions"], 1), help_text=PRIORITY_CONVERSIONS_HELP)
-with cols[2]: kpi_card("Priority CPA", priority_cpa_display(totals["priority_cpa"], totals["priority_conversions"]), help_text=PRIORITY_CONVERSIONS_HELP)
+with cols[0]: render_kpi_card("Total Spend", money(totals["spend"]), delta=top_deltas.get("spend"))
+with cols[1]: render_kpi_card("Priority Conversions", number(totals["priority_conversions"], 1), delta=top_deltas.get("priority_conversions"), help_text=PRIORITY_CONVERSIONS_HELP)
+with cols[2]: render_kpi_card("Priority CPA", priority_cpa_display(totals["priority_cpa"], totals["priority_conversions"]), delta=top_deltas.get("priority_cpa"), format_type="cost_efficiency", help_text=PRIORITY_CONVERSIONS_HELP)
 with cols[3]: kpi_card("Campaigns to Scale", number(status_count(action_matrix, "Scale")))
 with cols[4]: kpi_card("Campaigns to Optimize", number(status_count(action_matrix, "Optimize")))
 with cols[5]: kpi_card("Campaigns to Investigate", number(status_count(action_matrix, "Investigate")))

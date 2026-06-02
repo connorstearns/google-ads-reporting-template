@@ -55,6 +55,11 @@ def kpi_card(label, value, delta=None, help_text=None):
     st.metric(label=label, value=value, delta=delta, help=help_text)
 
 
+def render_kpi_card(label, value, delta=None, delta_help=None, format_type="number", help_text=None):
+    delta_color = "inverse" if format_type in {"lower", "cost_efficiency"} else "normal"
+    st.metric(label=label, value=value, delta=delta, help=help_text or delta_help, delta_color=delta_color)
+
+
 def metric_column_config():
     return {
         "spend": st.column_config.NumberColumn("Spend", format="$%.0f"),

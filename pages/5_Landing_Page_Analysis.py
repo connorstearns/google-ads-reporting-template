@@ -2,9 +2,10 @@ import pandas as pd
 import streamlit as st
 
 from src.filters import apply_global_filters, multiselect_if_available, render_sidebar
-from src.formatting import apply_page_style
+from src.formatting import apply_page_style, money, number, render_kpi_card
 from src.google_sheets import load_workbook
 from src.metrics import safe_divide
+from src.periods import top_kpi_deltas
 from src.tables import render_table
 from src.transforms import combine_primary_data
 
@@ -104,6 +105,7 @@ except Exception as exc:
 
 campaign, search, landing = combine_primary_data(data)
 filters = render_sidebar([campaign, search, landing], validation)
+landing_source = landing.copy()
 landing = apply_global_filters(landing, filters)
 
 if landing.empty or "final_url" not in landing.columns:
@@ -123,6 +125,18 @@ min_spend = st.sidebar.number_input("Weak efficiency minimum spend", min_value=0
 cpa_threshold = st.sidebar.number_input("Weak efficiency CPA threshold", min_value=0.0, value=250.0, step=25.0)
 
 landing = add_generic_metrics(landing)
+top_deltas = top_kpi_deltas(landing_source, filters, ["spend", "clicks", "conversions", "cpa"])
+totals = add_generic_metrics(pd.DataFrame([{
+    "spend": landing["spend"].sum(),
+    "impressions": landing["impressions"].sum(),
+    "clicks": landing["clicks"].sum(),
+    "conversions": landing["conversions"].sum(),
+}])).iloc[0]
+cols = st.columns(4)
+with cols[0]: render_kpi_card("Spend", money(totals["spend"]), delta=top_deltas.get("spend"))
+with cols[1]: render_kpi_card("Clicks", number(totals["clicks"]), delta=top_deltas.get("clicks"))
+with cols[2]: render_kpi_card("Conversions", number(totals["conversions"], 1), delta=top_deltas.get("conversions"))
+with cols[3]: render_kpi_card("CPA", money(totals["cpa"]), delta=top_deltas.get("cpa"), format_type="cost_efficiency")
 if "normalized_url" not in landing.columns:
     landing["normalized_url"] = landing["final_url"]
 for col in ACTION_QUEUE_COLUMNS:
