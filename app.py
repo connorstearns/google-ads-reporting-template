@@ -21,26 +21,26 @@ from src.periods import (
     get_date_range_from_preset,
     metric_direction,
 )
-from src.formatting import money, number, render_data_source_debug
+from src.formatting import render_data_source_debug
 
 
 ACCOUNT_CARDS = [
-    ("Spend", "spend", "money", None),
+    ("Spend", "spend", "currency", None),
     ("Impressions", "impressions", "number", None),
     ("Clicks", "clicks", "number", None),
     ("CTR", "ctr", "percent", None),
-    ("CPC", "cpc", "money2", "clicks"),
+    ("CPC", "cpc", "currency2", "clicks"),
 ]
 ENROLLMENT_CARDS = [
     ("Enrollment Apply Now Clicks", "enrollment_apply_now_clicks", "number1", None),
     ("Enrollment Forms", "enrollment_forms", "number1", None),
-    ("Cost / Enrollment Form", "cost_per_enrollment_form", "money", "enrollment_forms"),
+    ("Cost / Enrollment Form", "cost_per_enrollment_form", "currency", "enrollment_forms"),
     ("Form Share of Priority", "form_share_of_priority", "percent", "enrollment_priority_conversions"),
 ]
 RECRUITMENT_CARDS = [
     ("Career Clicks", "career_clicks", "number1", None),
     ("Applications Submitted", "applications_submitted", "number1", None),
-    ("Cost / Application Submitted", "cost_per_application_submitted", "money", "applications_submitted"),
+    ("Cost / Application Submitted", "cost_per_application_submitted", "currency", "applications_submitted"),
     ("Career Clicks per Application", "career_clicks_per_application", "ratio", "applications_submitted"),
 ]
 
@@ -83,23 +83,56 @@ def filtered_period_df(df, start, end, filters):
     return out
 
 
+def as_number(value):
+    if value is None:
+        return None
+    if isinstance(value, str) and not value.strip():
+        return None
+    try:
+        numeric = pd.to_numeric(value, errors="coerce")
+    except (TypeError, ValueError):
+        return None
+    if pd.isna(numeric):
+        return None
+    return float(numeric)
+
+
+def format_number(value, decimals=0):
+    numeric = as_number(value)
+    if numeric is None:
+        return "\u2014"
+    return f"{numeric:,.{decimals}f}"
+
+
+def format_currency(value, decimals=0):
+    numeric = as_number(value)
+    if numeric is None:
+        return "\u2014"
+    return f"${numeric:,.{decimals}f}"
+
+
+def format_percent(value, decimals=1):
+    numeric = as_number(value)
+    if numeric is None:
+        return "\u2014"
+    return f"{numeric * 100:,.{decimals}f}%"
+
+
 def format_value(metrics, key, kind, denominator_key=None):
     value = metrics.get(key)
     if denominator_key and metrics.get(denominator_key, 0) <= 0:
         return "\u2014"
-    if value is None or pd.isna(value):
-        return "\u2014"
-    if kind == "money":
-        return money(value)
-    if kind == "money2":
-        return money(value, 2)
+    if kind == "currency":
+        return format_currency(value)
+    if kind == "currency2":
+        return format_currency(value, 2)
     if kind == "percent":
-        return percent(value)
+        return format_percent(value)
     if kind == "number1":
-        return number(value, 1)
+        return format_number(value, 1)
     if kind == "ratio":
-        return number(value, 1)
-    return number(value)
+        return format_number(value, 1)
+    return format_number(value)
 
 
 def render_period_cards(title, current_metrics, comparison_metrics, card_specs, comparison_label, columns=3):
@@ -165,7 +198,7 @@ def benchmark_value(row, metric):
     value = row.get(metric)
     if value is None or pd.isna(value):
         return "—"
-    return f"{value * 100:+,.1f}%" if "pct" in metric or "vs_3mo" in metric else number(value, 1)
+    return f"{value * 100:+,.1f}%" if "pct" in metric or "vs_3mo" in metric else format_number(value, 1)
 
 
 def render_compact_benchmark_snapshot(latest):
@@ -224,27 +257,27 @@ def build_campaign_watchouts(df):
         return []
     watchouts = []
     top_spend = summary.iloc[0]
-    watchouts.append(("Highest spend campaign", top_spend["campaign"], money(top_spend["spend"])))
+    watchouts.append(("Highest spend campaign", top_spend["campaign"], format_currency(top_spend["spend"])))
     enrollment = summary[summary["objective"].eq("Enrollment")].copy()
     if not enrollment.empty:
         best_forms = enrollment[enrollment["enrollment_forms"] > 0].sort_values("cost_per_enrollment_form").head(1)
         if not best_forms.empty:
             row = best_forms.iloc[0]
-            watchouts.append(("Best cost / Enrollment Form", row["campaign"], money(row["cost_per_enrollment_form"])))
+            watchouts.append(("Best cost / Enrollment Form", row["campaign"], format_currency(row["cost_per_enrollment_form"])))
     recruitment = summary[summary["objective"].eq("Recruitment")].copy()
     if not recruitment.empty:
         best_apps = recruitment[recruitment["applications_submitted"] > 0].sort_values("cost_per_application_submitted").head(1)
         if not best_apps.empty:
             row = best_apps.iloc[0]
-            watchouts.append(("Best cost / Application Submitted", row["campaign"], money(row["cost_per_application_submitted"])))
+            watchouts.append(("Best cost / Application Submitted", row["campaign"], format_currency(row["cost_per_application_submitted"])))
     weak = summary[(summary["spend"] > 0) & (summary["enrollment_forms"].fillna(0) + summary["applications_submitted"].fillna(0) == 0)].head(1)
     if not weak.empty:
         row = weak.iloc[0]
-        watchouts.append(("High spend, low downstream outcomes", row["campaign"], money(row["spend"])))
+        watchouts.append(("High spend, low downstream outcomes", row["campaign"], format_currency(row["spend"])))
     weak_clicks = summary[(summary["clicks"] >= 20) & (summary["enrollment_forms"].fillna(0) + summary["applications_submitted"].fillna(0) == 0)].sort_values("clicks", ascending=False).head(1)
     if not weak_clicks.empty:
         row = weak_clicks.iloc[0]
-        watchouts.append(("Clicks with weak form/application volume", row["campaign"], number(row["clicks"])))
+        watchouts.append(("Clicks with weak form/application volume", row["campaign"], format_number(row["clicks"])))
     return watchouts[:5]
 
 
