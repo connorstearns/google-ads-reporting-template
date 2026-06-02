@@ -45,6 +45,11 @@ def render_table(df, title, caption="", sort_by="spend", search_cols=None, key=N
     shown = shown[[c for c in (display_columns or ordered_columns(shown)) if c in shown.columns]]
     for pct_col in [
         "ctr", "cvr", "spend_share", "click_share", "conversion_share", "spend_yoy_pct",
+        "apply_now_rate", "form_completion_rate", "click_to_form_rate",
+        "career_click_rate", "application_completion_rate", "click_to_application_rate",
+        "conversion_quality_ratio", "micro_rate", "primary_rate",
+        "priority_conversion_share", "search_impression_share", "search_top_impression_share",
+        "search_absolute_top_impression_share", "search_lost_is_budget", "search_lost_is_rank",
         "clicks_yoy_pct", "priority_conversions_yoy_pct", "priority_cpa_yoy_pct",
         "priority_cpa_vs_3mo_median", "priority_cpa_vs_3mo_benchmark",
         "priority_conversions_vs_3mo_median", "apply_now_clicks_yoy_pct",
