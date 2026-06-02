@@ -43,6 +43,61 @@ def display_percent(value):
     return f"{value * 100:+,.1f}%"
 
 
+def display_number(value):
+    if value is None or pd.isna(value):
+        return "—"
+    return number(value, 1)
+
+
+def display_ratio(numerator, denominator, suffix=""):
+    if denominator is None or pd.isna(denominator) or denominator <= 0:
+        return "—"
+    if numerator is None or pd.isna(numerator):
+        return "—"
+    return f"{numerator / denominator:,.1f}{suffix}"
+
+
+def display_cost(row, metric, denominator):
+    if denominator is None or pd.isna(denominator) or denominator <= 0:
+        return "—"
+    value = row.get(metric)
+    spend = row.get("spend")
+    if value is None or pd.isna(value) or (value <= 0 and spend is not None and not pd.isna(spend) and spend > 0):
+        if spend is None or pd.isna(spend):
+            return "—"
+        value = spend / denominator
+    return money(value)
+
+
+def render_enrollment_components(row):
+    apply_now_clicks = row.get("enrollment_apply_now_clicks")
+    enrollment_forms = row.get("enrollment_forms")
+    priority_conversions = row.get("priority_conversions")
+    st.caption("Priority Conversions combine Apply Now clicks and Enrollment Forms. Forms are the stronger downstream action.")
+    st.caption(f"Enrollment Apply Now Clicks: {display_number(apply_now_clicks)}")
+    st.caption(f"Enrollment Forms: {display_number(enrollment_forms)}")
+    st.caption(f"Cost / Enrollment Form: {display_cost(row, 'cost_per_enrollment_form', enrollment_forms)}")
+    st.caption(f"Form Share of Priority: {display_share(enrollment_forms, priority_conversions)}")
+
+
+def render_recruitment_components(row):
+    career_clicks = row.get("career_clicks")
+    applications_submitted = row.get("applications_submitted")
+    st.caption("Applications Submitted are the priority outcome. Career Clicks are shown as a diagnostic intent signal.")
+    st.caption(f"Career Clicks: {display_number(career_clicks)}")
+    st.caption(f"Applications Submitted: {display_number(applications_submitted)}")
+    st.caption(f"Cost / Application Submitted: {display_cost(row, 'cost_per_application_submitted', applications_submitted)}")
+    st.caption(f"Career Clicks per Application: {display_ratio(career_clicks, applications_submitted)}")
+
+
+def display_share(numerator, denominator):
+    if denominator is None or pd.isna(denominator) or denominator <= 0:
+        return "—"
+    if numerator is None or pd.isna(numerator):
+        return "—"
+    return f"{numerator / denominator * 100:,.1f}%"
+
+
 def render_campaign_type_cards(df, objective):
     rows = df[df["objective"].astype(str).str.casefold().eq(objective.casefold())]
     st.header(f"{objective} Benchmarks")
@@ -53,8 +108,12 @@ def render_campaign_type_cards(df, objective):
     for index, (_, row) in enumerate(rows.sort_values("campaign_type").iterrows()):
         with columns[index % len(columns)]:
             st.markdown(f"**{row.get('campaign_type', '')} / {row.get('objective', '')}**")
+            kpi_card("Priority Conversions", display_number(row.get("priority_conversions")))
             kpi_card("Priority CPA", priority_cpa_display(row.get("priority_cpa"), row.get("priority_conversions")))
-            st.caption(f"Priority conversions: {number(row.get('priority_conversions'), 1)}")
+            if objective == "Enrollment":
+                render_enrollment_components(row)
+            else:
+                render_recruitment_components(row)
             st.caption(f"3Mo Benchmark Status: {row.get('benchmark_status', '-')}")
             st.caption(f"Priority CPA vs 3Mo Median: {display_percent(row.get('priority_cpa_vs_3mo_median'))}")
             st.caption(f"YoY Benchmark Status: {row.get('yoy_benchmark_status', '-')}")
@@ -82,6 +141,34 @@ def benchmark_takeaways(df):
             )
         elif yoy_status == "Underperforming":
             bullets.append(f"{label} worsened YoY based on the sheet benchmark status.")
+        if row.get("objective") == "Enrollment":
+            apply_now_clicks = row.get("enrollment_apply_now_clicks")
+            enrollment_forms = row.get("enrollment_forms")
+            if (
+                apply_now_clicks is not None
+                and enrollment_forms is not None
+                and not pd.isna(apply_now_clicks)
+                and not pd.isna(enrollment_forms)
+                and apply_now_clicks > 0
+                and enrollment_forms / apply_now_clicks < 0.25
+            ):
+                bullets.append(
+                    f"{label} has fewer Enrollment Forms than Apply Now clicks, which may indicate form completion friction."
+                )
+        if row.get("objective") == "Recruitment":
+            career_clicks = row.get("career_clicks")
+            applications_submitted = row.get("applications_submitted")
+            if (
+                career_clicks is not None
+                and applications_submitted is not None
+                and not pd.isna(career_clicks)
+                and not pd.isna(applications_submitted)
+                and career_clicks > 0
+                and (applications_submitted == 0 or career_clicks / applications_submitted >= 3)
+            ):
+                bullets.append(
+                    f"{label} has Career Clicks that are not translating into Applications Submitted, which may indicate recruitment funnel drop-off."
+                )
         if recent_status == "Better":
             bullets.append(f"{label} improved versus its trailing 3-month benchmark.")
         elif recent_status in {"Watch", "Underperforming"}:

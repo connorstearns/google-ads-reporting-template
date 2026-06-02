@@ -13,7 +13,9 @@ SUPPRESSED_YOY_STATUSES = {
 
 BENCHMARK_TABLE_COLUMNS = [
     "month", "campaign_type", "objective", "spend", "clicks", "priority_conversions",
-    "priority_cpa", "trailing_3mo_median_priority_cpa", "priority_cpa_vs_3mo_median",
+    "priority_cpa", "enrollment_apply_now_clicks", "enrollment_forms",
+    "cost_per_enrollment_form", "career_clicks", "applications_submitted",
+    "cost_per_application_submitted", "trailing_3mo_median_priority_cpa", "priority_cpa_vs_3mo_median",
     "prior_year_priority_conversions", "prior_year_priority_cpa",
     "priority_conversions_yoy_pct", "priority_cpa_yoy_pct", "benchmark_status",
     "yoy_benchmark_status", "benchmark_note", "yoy_benchmark_note",
