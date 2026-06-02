@@ -1,7 +1,7 @@
 import pandas as pd
 import streamlit as st
 
-from src.benchmarks import UNAVAILABLE_MESSAGE, build_campaign_type_context, get_campaign_type_benchmarks
+from src.benchmarks import UNAVAILABLE_MESSAGE, build_campaign_type_context, get_campaign_type_benchmarks, priority_cpa_display
 from src.campaign_decisions import build_campaign_decisions, missing_optional_campaign_fields
 from src.charts import (
     campaign_conversion_mix_bar,
@@ -78,7 +78,7 @@ benchmarks = get_campaign_type_benchmarks(data)
 cols = st.columns(6)
 with cols[0]: kpi_card("Total spend", money(totals["spend"]))
 with cols[1]: kpi_card("Priority conversions", number(totals["priority_conversions"], 1), help_text=PRIORITY_CONVERSIONS_HELP)
-with cols[2]: kpi_card("Priority CPA", money(totals["priority_cpa"]), help_text=PRIORITY_CONVERSIONS_HELP)
+with cols[2]: kpi_card("Priority CPA", priority_cpa_display(totals["priority_cpa"], totals["priority_conversions"]), help_text=PRIORITY_CONVERSIONS_HELP)
 with cols[3]: kpi_card("Campaigns to investigate", number((campaign_level["status"] == "Investigate").sum()))
 with cols[4]: kpi_card("Campaigns to optimize", number((campaign_level["status"] == "Optimize").sum()))
 with cols[5]: kpi_card("Campaigns eligible to scale", number((campaign_level["status"] == "Scale").sum()))

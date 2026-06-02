@@ -1,6 +1,7 @@
 import pandas as pd
 import streamlit as st
 
+from src.benchmarks import priority_cpa_display
 from src.charts import (
     campaign_priority_cpa_bar,
     objective_funnel_bar,
@@ -100,7 +101,7 @@ cols = st.columns(4)
 with cols[0]: kpi_card("Enrollment Priority Conversions", number(enrollment["priority_conversions"], 1), help_text=PRIORITY_CONVERSIONS_HELP)
 with cols[1]: kpi_card("Cost per Apply Now Click", money(enrollment["cost_per_enrollment_apply_click"]))
 with cols[2]: kpi_card("Cost per Enrollment Form", money(enrollment["cost_per_enrollment_form"]))
-with cols[3]: kpi_card("Enrollment Priority CPA", money(enrollment["priority_cpa"]), help_text=PRIORITY_CONVERSIONS_HELP)
+with cols[3]: kpi_card("Enrollment Priority CPA", priority_cpa_display(enrollment["priority_cpa"], enrollment["priority_conversions"]), help_text=PRIORITY_CONVERSIONS_HELP)
 if enrollment["enrollment_apply_now_clicks"] > 0 and enrollment["enrollment_forms"] == 0:
     st.warning("Apply Now intent is not translating into form submissions.")
 enrollment_fig = objective_funnel_bar(campaign, "Enrollment", "Enrollment: Apply Now clicks vs forms by campaign")
@@ -120,7 +121,7 @@ cols = st.columns(4)
 with cols[0]: kpi_card("Recruitment Priority Conversions", number(recruitment["priority_conversions"], 1), help_text=PRIORITY_CONVERSIONS_HELP)
 with cols[1]: kpi_card("Cost per Career Click", money(recruitment["cost_per_career_click"]))
 with cols[2]: kpi_card("Cost per Application Submitted", money(recruitment["cost_per_application_submitted"]))
-with cols[3]: kpi_card("Recruitment Priority CPA", money(recruitment["priority_cpa"]), help_text=PRIORITY_CONVERSIONS_HELP)
+with cols[3]: kpi_card("Recruitment Priority CPA", priority_cpa_display(recruitment["priority_cpa"], recruitment["priority_conversions"]), help_text=PRIORITY_CONVERSIONS_HELP)
 if recruitment["career_clicks"] > 0 and recruitment["applications_submitted"] == 0:
     st.warning("Career interest is not translating into submitted applications.")
 recruitment_fig = objective_funnel_bar(campaign, "Recruitment", "Recruitment: career clicks vs applications submitted by campaign")

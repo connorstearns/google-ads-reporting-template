@@ -1,10 +1,14 @@
+import pandas as pd
 import streamlit as st
 from src.benchmarks import (
     RECRUITMENT_CAVEAT,
     UNAVAILABLE_MESSAGE,
     get_campaign_type_benchmarks,
-    latest_benchmarks,
+    get_latest_complete_benchmark_month,
+    latest_complete_benchmarks,
+    priority_cpa_display,
     recruitment_caveat_present,
+    yoy_percentage_display,
 )
 from src.formatting import apply_page_style
 from src.google_sheets import load_workbook
@@ -44,7 +48,6 @@ if summary.empty or campaign.empty:
 row = summary.iloc[0]
 deltas = {}
 if filters.get("date_range") and len(filters["date_range"]) == 2:
-    import pandas as pd
     deltas = period_delta(campaign, pd.to_datetime(filters["date_range"][0]), pd.to_datetime(filters["date_range"][1]))
 
 cols = st.columns(5)
@@ -57,7 +60,7 @@ cols = st.columns(4)
 with cols[0]: kpi_card("Total conversions", number(row.total_conversions, 1), signed_percent(deltas.get("conversions")))
 with cols[1]: kpi_card("CPA", money(row.cpa), signed_percent(deltas.get("cpa")))
 with cols[2]: kpi_card("Priority conversions", number(row.priority_conversions, 1), None, PRIORITY_CONVERSIONS_HELP)
-with cols[3]: kpi_card("Priority CPA", money(row.priority_cpa), None, PRIORITY_CONVERSIONS_HELP)
+with cols[3]: kpi_card("Priority CPA", priority_cpa_display(row.priority_cpa, row.priority_conversions), None, PRIORITY_CONVERSIONS_HELP)
 
 st.plotly_chart(spend_vs_conversions_bar_line(campaign), use_container_width=True)
 
@@ -99,11 +102,22 @@ render_table(objective, "Objective split", "Spend, traffic, and efficiency by ob
 render_table(campaign_summary.head(50), "Campaign diagnostics", "Top campaign rows sorted by spend.", key="campaign_diagnostics")
 
 st.subheader("Performance vs Benchmarks")
+st.caption("Benchmark cards use the latest complete month to avoid comparing partial current-month data against full historical periods.")
 benchmarks = get_campaign_type_benchmarks(data)
-latest = latest_benchmarks(benchmarks)
+latest_available_month = benchmarks["month"].max() if not benchmarks.empty else None
+latest_complete_month = get_latest_complete_benchmark_month(benchmarks)
+latest, benchmark_month_used, used_incomplete_fallback = latest_complete_benchmarks(benchmarks)
+current_month = pd.Timestamp.today().to_period("M").start_time
+current_month_rows_excluded = (
+    not benchmarks.empty
+    and benchmarks["month"].dt.to_period("M").dt.start_time.eq(current_month).any()
+    and benchmark_month_used != current_month
+)
 if latest.empty:
     st.info(UNAVAILABLE_MESSAGE)
 else:
+    if used_incomplete_fallback:
+        st.warning("No complete benchmark month is available. Benchmark cards are using the latest available month, which may be partial.")
     preferred_cards = [
         ("Nonbrand Search", "Enrollment"),
         ("Nonbrand Search", "Recruitment"),
@@ -123,11 +137,11 @@ else:
         for col, benchmark in zip(cols, card_rows):
             with col:
                 st.markdown(f"**{benchmark['campaign_type']} / {benchmark['objective']}**")
-                kpi_card("Priority CPA", money(benchmark.get("priority_cpa")))
+                kpi_card("Priority CPA", priority_cpa_display(benchmark.get("priority_cpa"), benchmark.get("priority_conversions")))
                 st.caption(f"3Mo Benchmark Status: {benchmark.get('benchmark_status', '-')}")
                 st.caption(f"YoY Benchmark Status: {benchmark.get('yoy_benchmark_status', '-')}")
-                st.caption(f"Priority CPA YoY: {signed_percent(benchmark.get('priority_cpa_yoy_pct')) or '-'}")
-                st.caption(f"Priority Conversions YoY: {signed_percent(benchmark.get('priority_conversions_yoy_pct')) or '-'}")
+                st.caption(f"Priority CPA YoY: {yoy_percentage_display(benchmark, 'priority_cpa_yoy_pct')}")
+                st.caption(f"Priority Conversions YoY: {yoy_percentage_display(benchmark, 'priority_conversions_yoy_pct')}")
     else:
         st.info("The latest benchmark month does not include the featured campaign type and objective combinations.")
     if recruitment_caveat_present(latest):
@@ -147,6 +161,15 @@ else:
         key="executive_benchmark_takeaways",
         display_columns=takeaway_columns,
     )
+    with st.expander("Benchmark card debug", expanded=False):
+        selected_date_range = filters.get("date_range")
+        st.write(f"Selected dashboard date range: `{selected_date_range or 'All available dates'}`")
+        st.write(f"Benchmark month used: `{benchmark_month_used:%b %Y}`")
+        st.write(f"Latest available benchmark month: `{latest_available_month:%b %Y}`")
+        st.write(f"Latest complete benchmark month: `{latest_complete_month.strftime('%b %Y') if latest_complete_month is not None else 'None available'}`")
+        st.write(f"Current month rows excluded: `{'Yes' if current_month_rows_excluded else 'No'}`")
+        st.caption("Rows used for the benchmark cards")
+        st.dataframe(pd.DataFrame(card_rows), use_container_width=True, hide_index=True)
 
 with st.expander("Data Source Debug", expanded=False):
     render_data_source_debug(campaign)

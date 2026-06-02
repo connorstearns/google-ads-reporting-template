@@ -1,22 +1,29 @@
 import pandas as pd
-import plotly.express as px
 import streamlit as st
 
 from src.benchmarks import (
-    ACTION_QUEUE_COLUMNS,
     BENCHMARK_TABLE_COLUMNS,
     RECRUITMENT_CAVEAT,
+    SUPPRESSED_YOY_STATUSES,
     UNAVAILABLE_MESSAGE,
+    add_fallback_yoy_status,
     comparable_yoy_rows,
-    get_benchmark_action_queue,
     get_campaign_type_benchmarks,
-    latest_benchmarks,
-    recruitment_caveat_present,
+    get_default_benchmark_month,
+    get_latest_complete_benchmark_month,
+    priority_cpa_display,
+    yoy_percentage_display,
 )
 from src.filters import render_sidebar
-from src.formatting import apply_page_style, kpi_card, money, number, signed_percent
+from src.formatting import apply_page_style, kpi_card, money, number
 from src.google_sheets import load_workbook
 from src.tables import render_table
+
+
+RECRUITMENT_CAVEAT_MESSAGE = (
+    "YoY priority-conversion comparisons are caveated because Applications Submitted "
+    "was not consistently tracked before July 2025."
+)
 
 
 def filter_benchmarks(df):
@@ -30,30 +37,56 @@ def filter_benchmarks(df):
     return out
 
 
-def benchmark_bar(df, current_col, benchmark_col, title):
-    required = {"campaign_type", "objective", current_col, benchmark_col}
-    if df.empty or not required.issubset(df.columns):
-        return None
-    chart = df.copy()
-    chart["campaign_type_objective"] = chart["campaign_type"].astype(str) + " / " + chart["objective"].astype(str)
-    chart = chart.melt(
-        id_vars="campaign_type_objective",
-        value_vars=[current_col, benchmark_col],
-        var_name="series",
-        value_name="value",
-    )
-    return px.bar(chart, x="campaign_type_objective", y="value", color="series", barmode="group", title=title)
+def display_percent(value):
+    if value is None or pd.isna(value):
+        return "-"
+    return f"{value * 100:+,.1f}%"
 
 
-def yoy_bar(df, metric, title):
-    required = {"campaign_type", "objective", metric}
-    if df.empty or not required.issubset(df.columns):
-        return None
-    chart = df.copy()
-    chart["campaign_type_objective"] = chart["campaign_type"].astype(str) + " / " + chart["objective"].astype(str)
-    fig = px.bar(chart, x="campaign_type_objective", y=metric, color="objective", title=title)
-    fig.update_yaxes(tickformat=".1%")
-    return fig
+def render_campaign_type_cards(df, objective):
+    rows = df[df["objective"].astype(str).str.casefold().eq(objective.casefold())]
+    st.header(f"{objective} Benchmarks")
+    if rows.empty:
+        st.info(f"No {objective.lower()} benchmark rows are available for this month.")
+        return
+    columns = st.columns(min(len(rows), 4))
+    for index, (_, row) in enumerate(rows.sort_values("campaign_type").iterrows()):
+        with columns[index % len(columns)]:
+            st.markdown(f"**{row.get('campaign_type', '')} / {row.get('objective', '')}**")
+            kpi_card("Priority CPA", priority_cpa_display(row.get("priority_cpa"), row.get("priority_conversions")))
+            st.caption(f"Priority conversions: {number(row.get('priority_conversions'), 1)}")
+            st.caption(f"3Mo Benchmark Status: {row.get('benchmark_status', '-')}")
+            st.caption(f"Priority CPA vs 3Mo Median: {display_percent(row.get('priority_cpa_vs_3mo_median'))}")
+            st.caption(f"YoY Benchmark Status: {row.get('yoy_benchmark_status', '-')}")
+            st.caption(f"Priority CPA YoY: {yoy_percentage_display(row, 'priority_cpa_yoy_pct')}")
+            st.caption(f"Priority Conversions YoY: {yoy_percentage_display(row, 'priority_conversions_yoy_pct')}")
+            note = str(row.get("yoy_benchmark_note", "") or "").strip()
+            if row.get("yoy_benchmark_status") == RECRUITMENT_CAVEAT:
+                st.warning(RECRUITMENT_CAVEAT_MESSAGE)
+            elif note:
+                st.caption(f"YoY note: {note}")
+
+
+def benchmark_takeaways(df):
+    bullets = []
+    for _, row in df.iterrows():
+        label = f"{row.get('campaign_type', '')} / {row.get('objective', '')}"
+        yoy_status = str(row.get("yoy_benchmark_status", "") or "").strip()
+        recent_status = str(row.get("benchmark_status", "") or "").strip()
+        if yoy_status == RECRUITMENT_CAVEAT:
+            bullets.append(RECRUITMENT_CAVEAT_MESSAGE)
+        elif row.get("objective") == "Enrollment" and yoy_status == "Better":
+            bullets.append(
+                f"{label} improved YoY: Priority CPA {yoy_percentage_display(row, 'priority_cpa_yoy_pct')} "
+                f"and Priority Conversions {yoy_percentage_display(row, 'priority_conversions_yoy_pct')}."
+            )
+        elif yoy_status == "Underperforming":
+            bullets.append(f"{label} worsened YoY based on the sheet benchmark status.")
+        if recent_status == "Better":
+            bullets.append(f"{label} improved versus its trailing 3-month benchmark.")
+        elif recent_status in {"Watch", "Underperforming"}:
+            bullets.append(f"{label} deteriorated versus its trailing 3-month benchmark.")
+    return list(dict.fromkeys(bullets))
 
 
 st.set_page_config(page_title="Benchmarking | HCZ Google Ads", layout="wide")
@@ -68,88 +101,75 @@ except Exception as exc:
     st.exception(exc)
     st.stop()
 
-render_sidebar([], validation)
+_ = render_sidebar([], validation)
 benchmarks = get_campaign_type_benchmarks(data)
 if benchmarks.empty:
     st.info(UNAVAILABLE_MESSAGE)
     st.stop()
 
 benchmarks = filter_benchmarks(benchmarks)
-latest = latest_benchmarks(benchmarks)
-if latest.empty:
+available_months = sorted(benchmarks["month"].dropna().unique(), reverse=True)
+if not available_months:
     st.info("No benchmark rows are available with the current filters.")
     st.stop()
 
+default_month = get_default_benchmark_month(benchmarks)
+latest_complete_month = get_latest_complete_benchmark_month(benchmarks)
+default_index = available_months.index(default_month) if default_month in available_months else 0
+selected_month = st.selectbox(
+    "Benchmark month",
+    available_months,
+    index=default_index,
+    format_func=lambda value: pd.Timestamp(value).strftime("%b %Y"),
+)
+selected_month = pd.Timestamp(selected_month)
+current_month = pd.Timestamp.today().to_period("M").start_time
+if latest_complete_month is None:
+    st.warning("No complete benchmark month is available. The latest available month is selected and may be partial.")
+if selected_month.to_period("M").start_time == current_month:
+    st.warning("This is a partial-month benchmark period and may not be comparable to full historical periods.")
+
+selected = add_fallback_yoy_status(benchmarks[benchmarks["month"].eq(selected_month)].copy())
+if selected.empty:
+    st.info("No benchmark rows are available for the selected month.")
+    st.stop()
+
 st.header("Benchmark Summary Cards")
-latest_month = latest["month"].max()
-latest_spend = latest.get("spend", pd.Series(dtype=float)).sum()
-latest_priority_conversions = latest.get("priority_conversions", pd.Series(dtype=float)).sum()
-latest_priority_cpa = latest_spend / latest_priority_conversions if latest_priority_conversions else 0
-comparable = comparable_yoy_rows(latest)
+total_spend = selected.get("spend", pd.Series(dtype=float)).sum()
+total_priority_conversions = selected.get("priority_conversions", pd.Series(dtype=float)).sum()
+blended_priority_cpa = total_spend / total_priority_conversions if total_priority_conversions else 0
+comparable = comparable_yoy_rows(selected)
+statuses = comparable.get("yoy_benchmark_status", pd.Series("", index=comparable.index))
+comparable = comparable[~statuses.isin(SUPPRESSED_YOY_STATUSES)]
 if "priority_cpa_yoy_pct" in comparable.columns:
     improvement = comparable[comparable["priority_cpa_yoy_pct"] < 0].nsmallest(1, "priority_cpa_yoy_pct")
     watchout = comparable[comparable["priority_cpa_yoy_pct"] > 0].nlargest(1, "priority_cpa_yoy_pct")
 else:
     improvement, watchout = pd.DataFrame(), pd.DataFrame()
 cols = st.columns(6)
-with cols[0]: kpi_card("Latest month", latest_month.strftime("%b %Y"))
-with cols[1]: kpi_card("Spend", money(latest_spend))
-with cols[2]: kpi_card("Priority conversions", number(latest_priority_conversions, 1))
-with cols[3]: kpi_card("Priority CPA", money(latest_priority_cpa))
-with cols[4]:
-    if improvement.empty:
-        kpi_card("Biggest YoY improvement", "-")
-    else:
-        row = improvement.iloc[0]
-        kpi_card("Biggest YoY improvement", f"{row.get('campaign_type', '')} / {row.get('objective', '')}", signed_percent(row.get("priority_cpa_yoy_pct")))
-with cols[5]:
-    if watchout.empty:
-        kpi_card("Biggest YoY watchout", "-")
-    else:
-        row = watchout.iloc[0]
-        kpi_card("Biggest YoY watchout", f"{row.get('campaign_type', '')} / {row.get('objective', '')}", signed_percent(row.get("priority_cpa_yoy_pct")))
+with cols[0]: kpi_card("Latest complete benchmark month", latest_complete_month.strftime("%b %Y") if latest_complete_month is not None else "-")
+with cols[1]: kpi_card("Total spend", money(total_spend))
+with cols[2]: kpi_card("Total priority conversions", number(total_priority_conversions, 1))
+with cols[3]: kpi_card("Blended Priority CPA", priority_cpa_display(blended_priority_cpa, total_priority_conversions))
+with cols[4]: kpi_card("Biggest YoY improvement", "-" if improvement.empty else f"{improvement.iloc[0].get('campaign_type', '')} / {improvement.iloc[0].get('objective', '')}")
+with cols[5]: kpi_card("Biggest YoY watchout", "-" if watchout.empty else f"{watchout.iloc[0].get('campaign_type', '')} / {watchout.iloc[0].get('objective', '')}")
 
-if recruitment_caveat_present(latest):
-    st.warning(
-        f"{RECRUITMENT_CAVEAT}: Applications Submitted was not consistently tracked before July 2025, "
-        "so Recruitment YoY priority-conversion comparisons should be treated cautiously."
+render_campaign_type_cards(selected, "Enrollment")
+render_campaign_type_cards(selected, "Recruitment")
+
+st.header("Benchmark Takeaways")
+takeaways = benchmark_takeaways(selected)
+for takeaway in takeaways:
+    st.write(f"- {takeaway}")
+if not takeaways:
+    st.info("No benchmark takeaways were generated for the selected month.")
+
+with st.expander("Show benchmark source table", expanded=False):
+    render_table(
+        benchmarks,
+        "Benchmark Source Table",
+        "Sheet-provided benchmark outputs grouped by month, campaign type, and objective.",
+        sort_by=None,
+        key="benchmark_source_table",
+        display_columns=BENCHMARK_TABLE_COLUMNS,
     )
-
-st.header("Campaign Type Benchmark Summary")
-render_table(benchmarks, "Benchmark Summary", "Sheet-provided benchmark outputs grouped by month, campaign type, and objective.", sort_by=None, key="benchmark_summary", display_columns=BENCHMARK_TABLE_COLUMNS)
-
-st.header("Current vs Trailing 3-Month Benchmark")
-left, right = st.columns(2)
-with left:
-    fig = benchmark_bar(latest, "priority_cpa", "trailing_3mo_median_priority_cpa", "Priority CPA vs trailing 3Mo median")
-    st.plotly_chart(fig, use_container_width=True) if fig is not None else st.info("Priority CPA benchmark chart is unavailable.")
-with right:
-    fig = benchmark_bar(latest, "priority_conversions", "trailing_3mo_median_priority_conversions", "Priority conversions vs trailing 3Mo median")
-    st.plotly_chart(fig, use_container_width=True) if fig is not None else st.info("Priority conversion benchmark chart is unavailable.")
-
-st.header("Current vs Prior Year")
-left, right = st.columns(2)
-with left:
-    fig = yoy_bar(latest, "priority_cpa_yoy_pct", "Priority CPA YoY %")
-    st.plotly_chart(fig, use_container_width=True) if fig is not None else st.info("Priority CPA YoY chart is unavailable.")
-with right:
-    fig = yoy_bar(latest, "priority_conversions_yoy_pct", "Priority conversions YoY %")
-    st.plotly_chart(fig, use_container_width=True) if fig is not None else st.info("Priority conversions YoY chart is unavailable.")
-if {"spend_yoy_pct", "priority_conversions_yoy_pct", "campaign_type", "objective"}.issubset(latest.columns):
-    scatter = px.scatter(
-        latest,
-        x="spend_yoy_pct",
-        y="priority_conversions_yoy_pct",
-        color="objective",
-        hover_name="campaign_type",
-        title="Spend YoY % vs priority conversions YoY %",
-    )
-    scatter.update_xaxes(tickformat=".1%")
-    scatter.update_yaxes(tickformat=".1%")
-    st.plotly_chart(scatter, use_container_width=True)
-else:
-    st.info("Spend vs priority conversions YoY scatterplot is unavailable.")
-
-st.header("Benchmark Action Queue")
-queue = get_benchmark_action_queue(data, benchmarks)
-render_table(queue, "Benchmark Action Queue", "Uses model_benchmark_flags when available; otherwise derives a review queue from Sheet benchmark statuses.", sort_by=None, key="benchmark_action_queue", display_columns=ACTION_QUEUE_COLUMNS)

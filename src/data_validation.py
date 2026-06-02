@@ -137,6 +137,17 @@ OPTIONAL_COLUMNS = {
     },
 }
 
+PRESERVE_MISSING_NUMERIC_COLUMNS = {
+    "prior_year_spend",
+    "prior_year_clicks",
+    "prior_year_priority_conversions",
+    "prior_year_priority_cpa",
+    "spend_yoy_pct",
+    "clicks_yoy_pct",
+    "priority_conversions_yoy_pct",
+    "priority_cpa_yoy_pct",
+}
+
 
 @dataclass
 class ValidationResult:
@@ -191,7 +202,9 @@ def coerce_types(df):
                 .str.replace(",", "", regex=False)
                 .str.replace("%", "", regex=False)
             )
-            out[col] = pd.to_numeric(out[col], errors="coerce").fillna(0)
+            out[col] = pd.to_numeric(out[col], errors="coerce")
+            if col not in PRESERVE_MISSING_NUMERIC_COLUMNS:
+                out[col] = out[col].fillna(0)
             out.loc[percent_mask, col] = out.loc[percent_mask, col] / 100
     return out
 
