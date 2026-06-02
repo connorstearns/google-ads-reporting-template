@@ -1,5 +1,12 @@
 import pandas as pd
 import streamlit as st
+
+st.set_page_config(
+    page_title="Executive Summary",
+    page_icon="📊",
+    layout="wide",
+)
+
 from src.benchmarks import (
     RECRUITMENT_CAVEAT,
     UNAVAILABLE_MESSAGE,
@@ -10,7 +17,7 @@ from src.benchmarks import (
 from src.formatting import apply_page_style
 from src.google_sheets import clear_data_cache, load_workbook
 from src.transforms import combine_primary_data
-from src.filters import multiselect_if_available, render_page_navigation, show_validation
+from src.filters import multiselect_if_available, show_validation
 from src.metrics import summarize
 from src.periods import (
     DATE_PRESETS,
@@ -46,7 +53,6 @@ RECRUITMENT_CARDS = [
 
 
 def render_executive_sidebar(campaign, validation):
-    render_page_navigation()
     st.sidebar.header("Filters")
     if st.sidebar.button("Refresh data", use_container_width=True):
         clear_data_cache()
@@ -295,7 +301,6 @@ def render_campaign_watchouts(df):
             st.caption(campaign_name)
 
 
-st.set_page_config(page_title="HCZ Google Ads Dashboard", layout="wide")
 apply_page_style()
 
 st.title("HCZ Google Ads Executive Summary")
