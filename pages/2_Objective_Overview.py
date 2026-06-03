@@ -219,25 +219,39 @@ recruitment_table = campaign_diagnostics(campaign, "Recruitment")
 enrollment_deltas = top_kpi_deltas(
     campaign_source[campaign_source["objective"].eq("Enrollment")],
     filters,
-    ["spend", "clicks", "enrollment_apply_now_clicks", "enrollment_forms", "priority_cpa"],
+    [
+        "spend", "clicks", "enrollment_apply_now_clicks", "enrollment_forms",
+        "enrollment_priority_conversions", "cost_per_apply_now_click",
+        "cost_per_enrollment_form", "priority_cpa", "apply_now_rate",
+        "form_completion_rate", "click_to_form_rate",
+    ],
 )
 recruitment_deltas = top_kpi_deltas(
     campaign_source[campaign_source["objective"].eq("Recruitment")],
     filters,
-    ["spend", "clicks", "career_clicks", "applications_submitted", "priority_cpa"],
+    [
+        "spend", "clicks", "career_clicks", "applications_submitted",
+        "recruitment_priority_conversions", "cost_per_career_click",
+        "cost_per_application_submitted", "priority_cpa", "career_click_rate",
+        "application_completion_rate", "click_to_application_rate",
+    ],
 )
 
 st.header("Enrollment Performance")
-cols = st.columns(4)
+cols = st.columns(5)
 with cols[0]: render_kpi_card("Spend", money(enrollment["spend"]), delta=enrollment_deltas.get("spend"))
 with cols[1]: render_kpi_card("Clicks", number(enrollment["clicks"]), delta=enrollment_deltas.get("clicks"))
 with cols[2]: render_kpi_card("Enrollment Apply Now Clicks", number(enrollment["enrollment_apply_now_clicks"], 1), delta=enrollment_deltas.get("enrollment_apply_now_clicks"))
 with cols[3]: render_kpi_card("Enrollment Forms", number(enrollment["enrollment_forms"], 1), delta=enrollment_deltas.get("enrollment_forms"))
-cols = st.columns(4)
-with cols[0]: kpi_card("Apply Now Rate", percent(enrollment.get("apply_now_rate", 0)), help_text="Enrollment Apply Now Clicks divided by Clicks.")
-with cols[1]: kpi_card("Form Completion Rate", percent(enrollment.get("form_completion_rate", 0)), help_text="Enrollment Forms divided by Enrollment Apply Now Clicks.")
-with cols[2]: kpi_card("Cost per Enrollment Form", money(enrollment["cost_per_enrollment_form"]))
-with cols[3]: render_kpi_card("Enrollment Priority CPA", priority_cpa_display(enrollment["priority_cpa"], enrollment["priority_conversions"]), delta=enrollment_deltas.get("priority_cpa"), format_type="cost_efficiency", help_text=PRIORITY_CONVERSIONS_HELP)
+with cols[4]: render_kpi_card("Enrollment Priority Conversions", number(enrollment["priority_conversions"], 1), delta=enrollment_deltas.get("enrollment_priority_conversions"), help_text=PRIORITY_CONVERSIONS_HELP)
+cols = st.columns(5)
+with cols[0]: render_kpi_card("Apply Now Rate", percent(enrollment.get("apply_now_rate", 0)), delta=enrollment_deltas.get("apply_now_rate"), help_text="Enrollment Apply Now Clicks divided by Clicks.")
+with cols[1]: render_kpi_card("Form Completion Rate", percent(enrollment.get("form_completion_rate", 0)), delta=enrollment_deltas.get("form_completion_rate"), help_text="Enrollment Forms divided by Enrollment Apply Now Clicks.")
+with cols[2]: render_kpi_card("Click-to-Form Rate", percent(enrollment.get("click_to_form_rate", 0)), delta=enrollment_deltas.get("click_to_form_rate"), help_text="Enrollment Forms divided by Clicks.")
+with cols[3]: render_kpi_card("Cost per Apply Now Click", money(enrollment.get("cost_per_apply_now_click", enrollment.get("cost_per_enrollment_apply_click", 0))), delta=enrollment_deltas.get("cost_per_apply_now_click"), format_type="cost_efficiency")
+with cols[4]: render_kpi_card("Cost per Enrollment Form", money(enrollment["cost_per_enrollment_form"]), delta=enrollment_deltas.get("cost_per_enrollment_form"), format_type="cost_efficiency")
+cols = st.columns(5)
+with cols[0]: render_kpi_card("Enrollment Priority CPA", priority_cpa_display(enrollment["priority_cpa"], enrollment["priority_conversions"]), delta=enrollment_deltas.get("priority_cpa"), format_type="cost_efficiency", help_text=PRIORITY_CONVERSIONS_HELP)
 if enrollment["enrollment_apply_now_clicks"] > 0 and enrollment["enrollment_forms"] == 0:
     st.warning("Apply Now intent is not translating into form submissions.")
 st.plotly_chart(funnel_chart(enrollment, "Enrollment"), use_container_width=True)
@@ -245,16 +259,20 @@ render_table(enrollment_tactics, "Enrollment tactic diagnostics", "Compare which
 render_table(enrollment_table, "Enrollment campaign diagnostics", "Identify campaigns that need landing page, targeting, or conversion action review.", key="enrollment_diagnostics", display_columns=ENROLLMENT_COLUMNS)
 
 st.header("Recruitment Performance")
-cols = st.columns(4)
+cols = st.columns(5)
 with cols[0]: render_kpi_card("Spend", money(recruitment["spend"]), delta=recruitment_deltas.get("spend"))
 with cols[1]: render_kpi_card("Clicks", number(recruitment["clicks"]), delta=recruitment_deltas.get("clicks"))
 with cols[2]: render_kpi_card("Career Clicks", number(recruitment["career_clicks"], 1), delta=recruitment_deltas.get("career_clicks"), help_text="Career Clicks are a mid-funnel recruitment intent metric. They do not count as Priority Conversions.")
 with cols[3]: render_kpi_card("Applications Submitted", number(recruitment["applications_submitted"], 1), delta=recruitment_deltas.get("applications_submitted"))
-cols = st.columns(4)
-with cols[0]: kpi_card("Career Click Rate", percent(recruitment.get("career_click_rate", 0)), help_text="Career Clicks divided by Clicks.")
-with cols[1]: kpi_card("Application Completion Rate", percent(recruitment.get("application_completion_rate", 0)), help_text="Applications Submitted divided by Career Clicks.")
-with cols[2]: kpi_card("Cost per Application", money(recruitment.get("cost_per_application", recruitment.get("cost_per_application_submitted", 0))))
-with cols[3]: render_kpi_card("Recruitment Priority CPA", priority_cpa_display(recruitment["priority_cpa"], recruitment["priority_conversions"]), delta=recruitment_deltas.get("priority_cpa"), format_type="cost_efficiency", help_text=PRIORITY_CONVERSIONS_HELP)
+with cols[4]: render_kpi_card("Recruitment Priority Conversions", number(recruitment["priority_conversions"], 1), delta=recruitment_deltas.get("recruitment_priority_conversions"), help_text=PRIORITY_CONVERSIONS_HELP)
+cols = st.columns(5)
+with cols[0]: render_kpi_card("Career Click Rate", percent(recruitment.get("career_click_rate", 0)), delta=recruitment_deltas.get("career_click_rate"), help_text="Career Clicks divided by Clicks.")
+with cols[1]: render_kpi_card("Application Completion Rate", percent(recruitment.get("application_completion_rate", 0)), delta=recruitment_deltas.get("application_completion_rate"), help_text="Applications Submitted divided by Career Clicks.")
+with cols[2]: render_kpi_card("Click-to-Application Rate", percent(recruitment.get("click_to_application_rate", 0)), delta=recruitment_deltas.get("click_to_application_rate"), help_text="Applications Submitted divided by Clicks.")
+with cols[3]: render_kpi_card("Cost per Career Click", money(recruitment.get("cost_per_career_click", 0)), delta=recruitment_deltas.get("cost_per_career_click"), format_type="cost_efficiency")
+with cols[4]: render_kpi_card("Cost per Application Submitted", money(recruitment.get("cost_per_application", recruitment.get("cost_per_application_submitted", 0))), delta=recruitment_deltas.get("cost_per_application_submitted"), format_type="cost_efficiency")
+cols = st.columns(5)
+with cols[0]: render_kpi_card("Recruitment Priority CPA", priority_cpa_display(recruitment["priority_cpa"], recruitment["priority_conversions"]), delta=recruitment_deltas.get("priority_cpa"), format_type="cost_efficiency", help_text=PRIORITY_CONVERSIONS_HELP)
 if recruitment["career_clicks"] > 0 and recruitment["applications_submitted"] == 0:
     st.warning("Career interest is not translating into submitted applications.")
 st.plotly_chart(funnel_chart(recruitment, "Recruitment"), use_container_width=True)

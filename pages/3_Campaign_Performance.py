@@ -8,7 +8,7 @@ from src.filters import apply_global_filters, render_sidebar
 from src.formatting import PRIORITY_CONVERSIONS_HELP, apply_page_style, kpi_card, money, number, render_conversion_model_debug, render_data_source_debug, render_kpi_card
 from src.google_sheets import load_workbook
 from src.metrics import summarize
-from src.periods import top_kpi_deltas
+from src.periods import get_filter_comparison_range, top_kpi_deltas
 from src.tables import render_table
 from src.transforms import combine_primary_data
 
@@ -255,6 +255,51 @@ def status_count(df, status):
     return int((df["action_status"] == status).sum()) if "action_status" in df.columns else 0
 
 
+def filtered_campaign_for_period(df, filters, start, end, ad_group_filter=None):
+    if df.empty or start is None or end is None:
+        return df.iloc[0:0].copy()
+    period_filters = dict(filters)
+    period_filters["date_range"] = (pd.Timestamp(start).date(), pd.Timestamp(end).date())
+    out = apply_global_filters(df, period_filters)
+    if ad_group_filter and "ad_group" in out.columns:
+        out = out[out["ad_group"].isin(ad_group_filter)]
+    return out
+
+
+def action_metric_counts(df, thresholds):
+    matrix = build_action_matrix(df, thresholds)
+    counts = {
+        "campaigns_eligible_to_scale": status_count(matrix, "Scale"),
+        "campaigns_to_optimize": status_count(matrix, "Optimize"),
+        "campaigns_to_investigate": status_count(matrix, "Investigate"),
+        "campaigns_with_quality_issues": status_count(matrix, "Quality issue"),
+    }
+    if impression_share_populated(matrix):
+        search_rows = build_search_market_penetration(matrix)
+        counts["budget_limited_search_campaigns"] = int(search_rows.get("search_lost_is_budget", pd.Series(dtype=float)).fillna(0).gt(0.2).sum())
+    return counts
+
+
+def action_count_deltas(source, filters, thresholds, ad_group_filter=None):
+    start, end, comp_start, comp_end, comparison_label = get_filter_comparison_range(filters)
+    if start is None or comp_start is None:
+        return {}
+    current_df = filtered_campaign_for_period(source, filters, start, end, ad_group_filter)
+    comparison_df = filtered_campaign_for_period(source, filters, comp_start, comp_end, ad_group_filter)
+    if comparison_df.empty:
+        return {}
+    current_counts = action_metric_counts(current_df, thresholds)
+    comparison_counts = action_metric_counts(comparison_df, thresholds)
+    deltas = {}
+    for metric, current_value in current_counts.items():
+        comparison_value = comparison_counts.get(metric)
+        if comparison_value is None or pd.isna(comparison_value):
+            deltas[metric] = None
+        else:
+            deltas[metric] = f"{int(current_value - comparison_value):+,d} vs {comparison_label}"
+    return deltas
+
+
 st.set_page_config(page_title="Campaign Performance | HCZ Google Ads", layout="wide")
 apply_page_style()
 st.title("Campaign Performance")
@@ -294,6 +339,7 @@ thresholds = filters["thresholds"]
 totals = summarize(campaign).iloc[0]
 top_deltas = top_kpi_deltas(campaign_source, filters, ["spend", "priority_conversions", "priority_cpa"])
 action_matrix = build_action_matrix(campaign, thresholds)
+count_deltas = action_count_deltas(campaign_source, filters, thresholds, ad_group_filter)
 tactic_allocation = build_tactic_allocation(action_matrix)
 benchmarks = get_campaign_type_benchmarks(data)
 present_search_is = impression_share_columns_present(action_matrix)
@@ -304,12 +350,12 @@ cols = st.columns(7)
 with cols[0]: render_kpi_card("Total Spend", money(totals["spend"]), delta=top_deltas.get("spend"))
 with cols[1]: render_kpi_card("Priority Conversions", number(totals["priority_conversions"], 1), delta=top_deltas.get("priority_conversions"), help_text=PRIORITY_CONVERSIONS_HELP)
 with cols[2]: render_kpi_card("Priority CPA", priority_cpa_display(totals["priority_cpa"], totals["priority_conversions"]), delta=top_deltas.get("priority_cpa"), format_type="cost_efficiency", help_text=PRIORITY_CONVERSIONS_HELP)
-with cols[3]: kpi_card("Campaigns to Scale", number(status_count(action_matrix, "Scale")))
-with cols[4]: kpi_card("Campaigns to Optimize", number(status_count(action_matrix, "Optimize")))
-with cols[5]: kpi_card("Campaigns to Investigate", number(status_count(action_matrix, "Investigate")))
+with cols[3]: render_kpi_card("Campaigns Eligible to Scale", number(status_count(action_matrix, "Scale")), delta=count_deltas.get("campaigns_eligible_to_scale"))
+with cols[4]: render_kpi_card("Campaigns to Optimize", number(status_count(action_matrix, "Optimize")), delta=count_deltas.get("campaigns_to_optimize"), format_type="lower")
+with cols[5]: render_kpi_card("Campaigns to Investigate", number(status_count(action_matrix, "Investigate")), delta=count_deltas.get("campaigns_to_investigate"), format_type="lower")
 if search_is_ready:
     budget_limited = search_market.get("search_lost_is_budget", pd.Series(dtype=float)).fillna(0).gt(0.2).sum()
-    with cols[6]: kpi_card("Budget-Limited Search Campaigns", number(budget_limited))
+    with cols[6]: render_kpi_card("Budget-Limited Search Campaigns", number(budget_limited), delta=count_deltas.get("budget_limited_search_campaigns"), format_type="lower")
 else:
     missing_label = "Campaigns Missing Search IS Data" if present_search_is else "Search IS Fields Missing"
     with cols[6]: kpi_card(missing_label, number(len(action_matrix)))
