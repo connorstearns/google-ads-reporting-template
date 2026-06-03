@@ -51,13 +51,36 @@ def apply_page_style():
     )
 
 
-def kpi_card(label, value, delta=None, help_text=None):
-    st.metric(label=label, value=value, delta=delta, help=help_text)
+def kpi_card(label, value, delta=None, help_text=None, delta_label=None, inverse_good=False):
+    delta_color = "inverse" if inverse_good else "normal"
+    delta_text = labeled_delta(delta, delta_label)
+    st.metric(label=label, value=value, delta=delta_text, help=help_text, delta_color=delta_color)
 
 
-def render_kpi_card(label, value, delta=None, delta_help=None, format_type="number", help_text=None):
-    delta_color = "inverse" if format_type in {"lower", "cost_efficiency"} else "normal"
-    st.metric(label=label, value=value, delta=delta, help=help_text or delta_help, delta_color=delta_color)
+def render_kpi_card(
+    label,
+    value,
+    delta=None,
+    delta_label=None,
+    help_text=None,
+    format_type="number",
+    inverse_good=False,
+    delta_help=None,
+):
+    lower_is_better = inverse_good or format_type in {"lower", "cost", "currency_inverse", "cost_efficiency"}
+    delta_color = "inverse" if lower_is_better else "normal"
+    delta_text = labeled_delta(delta, delta_label)
+    st.metric(label=label, value=value, delta=delta_text, help=help_text or delta_help, delta_color=delta_color)
+
+
+def labeled_delta(delta, delta_label=None):
+    if delta is None:
+        return None
+    if not delta_label:
+        return delta
+    text = str(delta)
+    label = str(delta_label)
+    return text if label in text else f"{text} {label}"
 
 
 def metric_column_config():

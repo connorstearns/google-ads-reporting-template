@@ -13,7 +13,7 @@ from src.filters import apply_global_filters, render_sidebar
 from src.formatting import PRIORITY_CONVERSIONS_HELP, apply_page_style, kpi_card, money, number, percent, render_conversion_model_debug, render_data_source_debug, render_kpi_card
 from src.google_sheets import load_workbook
 from src.metrics import safe_divide, summarize
-from src.periods import top_kpi_deltas
+from src.periods import get_filter_comparison_range, top_kpi_deltas
 from src.tables import render_table
 from src.transforms import combine_primary_data
 
@@ -196,7 +196,7 @@ except Exception as exc:
     st.stop()
 
 campaign, search, landing = combine_primary_data(data)
-filters = render_sidebar([campaign, search, landing], validation)
+filters = render_sidebar([campaign, search, landing], validation, date_presets=True)
 campaign_source = campaign.copy()
 campaign = apply_global_filters(campaign, filters)
 
@@ -216,6 +216,12 @@ enrollment_tactics = tactic_diagnostics(campaign, "Enrollment")
 recruitment_tactics = tactic_diagnostics(campaign, "Recruitment")
 enrollment_table = campaign_diagnostics(campaign, "Enrollment")
 recruitment_table = campaign_diagnostics(campaign, "Recruitment")
+start, end, comp_start, comp_end, comparison_label = get_filter_comparison_range(filters)
+if start is not None and comp_start is not None:
+    st.caption(
+        f"Current period: {start:%Y-%m-%d} to {end:%Y-%m-%d} | "
+        f"Comparison period: {comp_start:%Y-%m-%d} to {comp_end:%Y-%m-%d} ({comparison_label})"
+    )
 enrollment_deltas = top_kpi_deltas(
     campaign_source[campaign_source["objective"].eq("Enrollment")],
     filters,

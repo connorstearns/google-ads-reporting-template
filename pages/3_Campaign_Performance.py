@@ -313,7 +313,7 @@ except Exception as exc:
     st.stop()
 
 campaign, search, landing = combine_primary_data(data)
-filters = render_sidebar([campaign, search, landing], validation, thresholds=True)
+filters = render_sidebar([campaign, search, landing], validation, thresholds=True, date_presets=True)
 campaign_source = campaign.copy()
 campaign = apply_global_filters(campaign, filters)
 
@@ -337,6 +337,12 @@ if "ad_group" in campaign.columns:
 
 thresholds = filters["thresholds"]
 totals = summarize(campaign).iloc[0]
+start, end, comp_start, comp_end, comparison_label = get_filter_comparison_range(filters)
+if start is not None and comp_start is not None:
+    st.caption(
+        f"Current period: {start:%Y-%m-%d} to {end:%Y-%m-%d} | "
+        f"Comparison period: {comp_start:%Y-%m-%d} to {comp_end:%Y-%m-%d} ({comparison_label})"
+    )
 top_deltas = top_kpi_deltas(campaign_source, filters, ["spend", "priority_conversions", "priority_cpa"])
 action_matrix = build_action_matrix(campaign, thresholds)
 count_deltas = action_count_deltas(campaign_source, filters, thresholds, ad_group_filter)
@@ -345,20 +351,25 @@ benchmarks = get_campaign_type_benchmarks(data)
 present_search_is = impression_share_columns_present(action_matrix)
 search_is_ready = impression_share_populated(action_matrix)
 search_market = build_search_market_penetration(action_matrix)
+quality_issue_count = status_count(action_matrix, "Quality issue")
 
-cols = st.columns(7)
+cols = st.columns(8 if quality_issue_count else 7)
 with cols[0]: render_kpi_card("Total Spend", money(totals["spend"]), delta=top_deltas.get("spend"))
 with cols[1]: render_kpi_card("Priority Conversions", number(totals["priority_conversions"], 1), delta=top_deltas.get("priority_conversions"), help_text=PRIORITY_CONVERSIONS_HELP)
 with cols[2]: render_kpi_card("Priority CPA", priority_cpa_display(totals["priority_cpa"], totals["priority_conversions"]), delta=top_deltas.get("priority_cpa"), format_type="cost_efficiency", help_text=PRIORITY_CONVERSIONS_HELP)
 with cols[3]: render_kpi_card("Campaigns Eligible to Scale", number(status_count(action_matrix, "Scale")), delta=count_deltas.get("campaigns_eligible_to_scale"))
 with cols[4]: render_kpi_card("Campaigns to Optimize", number(status_count(action_matrix, "Optimize")), delta=count_deltas.get("campaigns_to_optimize"), format_type="lower")
 with cols[5]: render_kpi_card("Campaigns to Investigate", number(status_count(action_matrix, "Investigate")), delta=count_deltas.get("campaigns_to_investigate"), format_type="lower")
+search_card_index = 6
+if quality_issue_count:
+    with cols[6]: render_kpi_card("Campaigns with Quality Issues", number(quality_issue_count), delta=count_deltas.get("campaigns_with_quality_issues"), format_type="lower")
+    search_card_index = 7
 if search_is_ready:
     budget_limited = search_market.get("search_lost_is_budget", pd.Series(dtype=float)).fillna(0).gt(0.2).sum()
-    with cols[6]: render_kpi_card("Budget-Limited Search Campaigns", number(budget_limited), delta=count_deltas.get("budget_limited_search_campaigns"), format_type="lower")
+    with cols[search_card_index]: render_kpi_card("Budget-Limited Search Campaigns", number(budget_limited), delta=count_deltas.get("budget_limited_search_campaigns"), format_type="lower")
 else:
     missing_label = "Campaigns Missing Search IS Data" if present_search_is else "Search IS Fields Missing"
-    with cols[6]: kpi_card(missing_label, number(len(action_matrix)))
+    with cols[search_card_index]: kpi_card(missing_label, number(len(action_matrix)))
 
 st.subheader("Campaign Action Matrix")
 st.caption("One row per campaign. Status compares each campaign's priority CPA to the average CPA for its objective.")

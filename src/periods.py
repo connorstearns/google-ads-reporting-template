@@ -135,6 +135,11 @@ def get_filter_comparison_range(filters, preset="Custom range"):
         return None, None, None, None, None
     start = pd.Timestamp(dates[0]).normalize()
     end = pd.Timestamp(dates[1]).normalize()
+    comparison_dates = filters.get("comparison_range")
+    if comparison_dates and len(comparison_dates) == 2:
+        comp_start = pd.Timestamp(comparison_dates[0]).normalize()
+        comp_end = pd.Timestamp(comparison_dates[1]).normalize()
+        return start, end, comp_start, comp_end, filters.get("comparison_label") or "prior period"
     preset = infer_comparison_preset(start, end, preset)
     comp_start, comp_end, label = get_comparison_range(start, end, preset)
     return start, end, comp_start, comp_end, comparison_label(label)
