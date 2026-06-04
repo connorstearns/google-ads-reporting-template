@@ -20,6 +20,7 @@ from src.periods import (
     format_delta,
     get_comparison_range,
     get_date_range_from_preset,
+    latest_complete_month_range,
     metric_direction,
 )
 from src.formatting import render_data_source_debug
@@ -54,16 +55,26 @@ def render_executive_sidebar(campaign, validation):
     today = pd.Timestamp.today().normalize()
     if "date" in campaign.columns and campaign["date"].notna().any():
         today = min(today, campaign["date"].max().normalize())
+    min_date = campaign["date"].min().date() if "date" in campaign.columns and campaign["date"].notna().any() else today.date()
+    max_date = campaign["date"].max().date() if "date" in campaign.columns and campaign["date"].notna().any() else today.date()
+    latest_start, latest_end, latest_is_partial = latest_complete_month_range(max_date, min_date)
     preset = st.sidebar.selectbox("Date preset", DATE_PRESETS, index=0)
     if preset == "Custom range" and "date" in campaign.columns and campaign["date"].notna().any():
-        min_date, max_date = campaign["date"].min().date(), campaign["date"].max().date()
-        selected = st.sidebar.date_input("Custom range", (min_date, max_date), min_value=min_date, max_value=max_date)
+        selected = st.sidebar.date_input("Custom range", (latest_start.date(), latest_end.date()), min_value=min_date, max_value=max_date)
         start, end = (pd.Timestamp(selected[0]), pd.Timestamp(selected[1])) if len(selected) == 2 else (pd.Timestamp(min_date), pd.Timestamp(max_date))
     else:
-        start, end = get_date_range_from_preset(preset, today)
+        start, end = get_date_range_from_preset(preset, today, min_date)
     st.sidebar.caption(f"Current period: {start:%b %d, %Y} - {end:%b %d, %Y}")
     comp_start, comp_end, comparison_label = get_comparison_range(start, end, preset)
     st.sidebar.caption(f"Comparison: {comp_start:%b %d, %Y} - {comp_end:%b %d, %Y}")
+    st.sidebar.caption(f"Data through {pd.Timestamp(max_date):%b %d, %Y}")
+    with st.sidebar.expander("Data status", expanded=False):
+        st.caption(f"Data through: {pd.Timestamp(max_date):%b %d, %Y}")
+        st.caption(f"Latest complete month: {latest_start:%b %d, %Y} - {latest_end:%b %d, %Y}")
+        if latest_is_partial:
+            st.warning("Only partial current-month data is available; the default period is partial.")
+        st.caption(f"Selected period: {start:%b %d, %Y} - {end:%b %d, %Y}")
+        st.caption(f"Comparison period: {comp_start:%b %d, %Y} - {comp_end:%b %d, %Y}")
     filters = {
         "campaign": multiselect_if_available("Campaign", campaign, "campaign"),
         "network": multiselect_if_available("Network", campaign, "network"),

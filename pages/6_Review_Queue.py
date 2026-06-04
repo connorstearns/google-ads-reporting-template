@@ -20,15 +20,28 @@ except Exception as exc:
     st.stop()
 
 campaign, search, landing = combine_primary_data(data)
-filters = render_sidebar([campaign, search, landing], validation, thresholds=True)
+sheet_queue = data.get("review_queue")
+filters = render_sidebar([campaign, search, landing, sheet_queue], validation, thresholds=True)
 campaign = apply_global_filters(campaign, filters)
 search = apply_global_filters(search, filters)
 landing = apply_global_filters(landing, filters)
+sheet_queue = apply_global_filters(sheet_queue, filters) if sheet_queue is not None else sheet_queue
 
-queue = build_review_queue(campaign, search, landing, filters["thresholds"])
+queue = sheet_queue.copy() if sheet_queue is not None and not sheet_queue.empty else build_review_queue(campaign, search, landing, filters["thresholds"])
 if queue.empty:
     st.success("No review queue items match the current filters and thresholds.")
     st.stop()
+
+if "priority_score" not in queue.columns:
+    queue["priority_score"] = 0
+if "spend" not in queue.columns:
+    queue["spend"] = 0
+if "issue_type" not in queue.columns:
+    queue["issue_type"] = queue.get("primary_issue", "Review item")
+if "entity_name" not in queue.columns:
+    queue["entity_name"] = queue.get("campaign", queue.get("search_term", queue.get("final_url", "Review item")))
+if "recommended_action" not in queue.columns:
+    queue["recommended_action"] = queue.get("action", "")
 
 top = queue.groupby("issue_type", as_index=False).agg(priority_score=("priority_score", "sum"), spend=("spend", "sum")).sort_values("priority_score", ascending=False)
 render_table(top, "Issue summary", "Rollup of active optimization issues by category.", key="issue_summary")

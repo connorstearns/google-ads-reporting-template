@@ -4,6 +4,7 @@ from .metrics import safe_divide, summarize
 
 
 DATE_PRESETS = [
+    "Latest complete month",
     "Last 7 days",
     "Last week",
     "Last 30 days",
@@ -35,8 +36,36 @@ LOWER_IS_BETTER = {
 NEUTRAL_METRICS = set()
 
 
-def get_date_range_from_preset(preset, today):
+def latest_complete_month_range(max_date, min_date=None):
+    max_date = pd.Timestamp(max_date).normalize()
+    min_date = pd.Timestamp(min_date).normalize() if min_date is not None else None
+    month_start = max_date.replace(day=1)
+    month_end = (month_start + pd.offsets.MonthEnd(0)).normalize()
+    if max_date >= month_end:
+        start = month_start
+        end = month_end
+        partial = False
+    else:
+        previous_month_start = (month_start - pd.DateOffset(months=1)).normalize()
+        previous_month_end = (month_start - pd.Timedelta(days=1)).normalize()
+        if min_date is not None and previous_month_end < min_date:
+            start = max(month_start, min_date)
+            end = max_date
+            partial = True
+        else:
+            start = previous_month_start
+            end = previous_month_end
+            partial = False
+    if min_date is not None and start < min_date:
+        start = min_date
+    return start.normalize(), end.normalize(), partial
+
+
+def get_date_range_from_preset(preset, today, min_date=None):
     today = pd.Timestamp(today).normalize()
+    if preset == "Latest complete month":
+        start, end, _ = latest_complete_month_range(today, min_date)
+        return start, end
     if preset == "Last 7 days":
         return today - pd.Timedelta(days=6), today
     if preset == "Last week":
@@ -71,6 +100,10 @@ def get_comparison_range(start_date, end_date, preset):
         days = (end - start).days + 1
         comp_end = start - pd.Timedelta(days=1)
         return comp_end - pd.Timedelta(days=days - 1), comp_end, "WoW" if preset == "Last 7 days" else ("Previous 30D" if preset == "Last 30 days" else "Prior Period")
+    if preset == "Latest complete month":
+        comp_start = start - pd.DateOffset(months=1)
+        comp_end = start - pd.Timedelta(days=1)
+        return comp_start.normalize(), comp_end.normalize(), "MoM"
     if preset == "Last week":
         return start - pd.Timedelta(days=7), end - pd.Timedelta(days=7), "WoW"
     if preset == "Last month":

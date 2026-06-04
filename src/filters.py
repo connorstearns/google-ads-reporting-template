@@ -2,30 +2,32 @@ import pandas as pd
 import streamlit as st
 from .google_sheets import clear_data_cache
 from .config import DEFAULT_THRESHOLDS
-from .periods import DATE_PRESETS, get_comparison_range, get_date_range_from_preset, comparison_label
+from .periods import DATE_PRESETS, comparison_label, get_comparison_range, get_date_range_from_preset, latest_complete_month_range
 
 
-def render_sidebar(dataframes, validation=None, thresholds=False, date_presets=False):
+def render_sidebar(dataframes, validation=None, thresholds=False, date_presets=True):
     st.sidebar.header("Filters")
     if st.sidebar.button("Refresh data", use_container_width=True):
         clear_data_cache()
         st.rerun()
 
-    combined = pd.concat([df for df in dataframes if df is not None and not df.empty], ignore_index=True) if any(not df.empty for df in dataframes) else pd.DataFrame()
+    usable_frames = [df for df in dataframes if df is not None and not df.empty]
+    combined = pd.concat(usable_frames, ignore_index=True) if usable_frames else pd.DataFrame()
     date_range = None
     comparison_range = None
     comparison_text = None
     date_preset = None
     if "date" in combined.columns and combined["date"].notna().any():
         min_date, max_date = combined["date"].min().date(), combined["date"].max().date()
+        latest_start, latest_end, latest_is_partial = latest_complete_month_range(max_date, min_date)
         if date_presets:
             today = min(pd.Timestamp.today().normalize(), pd.Timestamp(max_date))
             date_preset = st.sidebar.selectbox("Date preset", DATE_PRESETS, index=0)
             if date_preset == "Custom range":
-                selected = st.sidebar.date_input("Custom range", (min_date, max_date), min_value=min_date, max_value=max_date)
+                selected = st.sidebar.date_input("Custom range", (latest_start.date(), latest_end.date()), min_value=min_date, max_value=max_date)
                 start, end = (pd.Timestamp(selected[0]), pd.Timestamp(selected[1])) if len(selected) == 2 else (pd.Timestamp(min_date), pd.Timestamp(max_date))
             else:
-                start, end = get_date_range_from_preset(date_preset, today)
+                start, end = get_date_range_from_preset(date_preset, today, min_date)
             date_range = (start.date(), end.date())
             comp_start, comp_end, raw_comparison_label = get_comparison_range(start, end, date_preset)
             comparison_range = (comp_start.date(), comp_end.date()) if comp_start is not None and comp_end is not None else None
@@ -34,8 +36,17 @@ def render_sidebar(dataframes, validation=None, thresholds=False, date_presets=F
             if comp_start is not None and comp_end is not None:
                 st.sidebar.caption(f"Comparison: {comp_start:%b %d, %Y} - {comp_end:%b %d, %Y}")
         else:
-            date_range = st.sidebar.date_input("Date range", (min_date, max_date), min_value=min_date, max_value=max_date)
+            date_range = st.sidebar.date_input("Date range", (latest_start.date(), latest_end.date()), min_value=min_date, max_value=max_date)
         st.sidebar.caption(f"Data through {max_date:%b %d, %Y}")
+        with st.sidebar.expander("Data status", expanded=False):
+            st.caption(f"Data through: {max_date:%b %d, %Y}")
+            st.caption(f"Latest complete month: {latest_start:%b %d, %Y} - {latest_end:%b %d, %Y}")
+            if latest_is_partial:
+                st.warning("Only partial current-month data is available; the default period is partial.")
+            if date_range and len(date_range) == 2:
+                st.caption(f"Selected period: {pd.Timestamp(date_range[0]):%b %d, %Y} - {pd.Timestamp(date_range[1]):%b %d, %Y}")
+            if comparison_range:
+                st.caption(f"Comparison period: {pd.Timestamp(comparison_range[0]):%b %d, %Y} - {pd.Timestamp(comparison_range[1]):%b %d, %Y}")
 
     objective = multiselect_if_available("Objective", combined, "objective")
     campaign = multiselect_if_available("Campaign", combined, "campaign")

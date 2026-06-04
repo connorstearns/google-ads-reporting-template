@@ -56,6 +56,10 @@ def numeric_or_zero(value):
 
 
 def campaign_group_columns(df):
+    if "objective" not in df.columns:
+        df["objective"] = "Other / Unmapped"
+    if "campaign" not in df.columns:
+        df["campaign"] = "Unknown campaign"
     cols = ["objective", "campaign"]
     for col in ["campaign_type", "campaign_role", "campaign_status", "advertising_channel_type"]:
         if col in df.columns:
@@ -137,6 +141,11 @@ def recommended_action(row):
 
 
 def build_action_matrix(campaign, thresholds):
+    campaign = campaign.copy()
+    if "objective" not in campaign.columns:
+        campaign["objective"] = "Other / Unmapped"
+    if "campaign" not in campaign.columns:
+        campaign["campaign"] = "Unknown campaign"
     grouped = summarize(campaign, campaign_group_columns(campaign))
     for col in SEARCH_IS_COLUMNS:
         if col in campaign.columns:
@@ -151,8 +160,8 @@ def build_action_matrix(campaign, thresholds):
 
 
 def tactic_source_column(df):
-    for col in ["campaign_type", "campaign_role", "advertising_channel_type"]:
-        if col in df.columns:
+    for col in ["campaign_type", "campaign_role", "advertising_channel_type", "campaign"]:
+        if col in df.columns and df[col].fillna("").astype(str).str.strip().ne("").any():
             return col
     return None
 
@@ -180,6 +189,9 @@ def build_tactic_allocation(action_matrix):
 
 
 def efficiency_label(value):
+    value = pd.to_numeric(pd.Series([value]), errors="coerce").iloc[0]
+    if pd.isna(value):
+        return "Needs data"
     if value > 1.2:
         return "Over-performing relative to budget share"
     if value < 0.8:
