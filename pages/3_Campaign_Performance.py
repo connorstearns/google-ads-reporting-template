@@ -312,7 +312,6 @@ def action_count_deltas(source, filters, thresholds, ad_group_filter=None):
     return deltas
 
 
-st.set_page_config(page_title="Campaign Performance | HCZ Google Ads", layout="wide")
 apply_page_style()
 st.title("Campaign Performance")
 st.caption("Campaign-management decision dashboard focused on objective-quality outcomes, peer efficiency, budget allocation, and next actions.")

@@ -90,7 +90,6 @@ def local_action(row):
     return "Maintain and monitor"
 
 
-st.set_page_config(page_title="Landing Page Analysis | HCZ Google Ads", layout="wide")
 apply_page_style()
 st.title("Landing Page Analysis")
 st.caption("Page alignment and CRO triage workflow for landing-page media efficiency, intent match, and conversion-action audit risk.")

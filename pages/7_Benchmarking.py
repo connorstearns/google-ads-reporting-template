@@ -119,7 +119,6 @@ def benchmark_takeaways(df):
     return list(dict.fromkeys(bullets))
 
 
-st.set_page_config(page_title="Benchmarking | HCZ Google Ads", layout="wide")
 apply_page_style()
 st.title("Benchmarking")
 st.caption("Compare current performance against recent historical norms and prior-year benchmarks by campaign type and objective.")

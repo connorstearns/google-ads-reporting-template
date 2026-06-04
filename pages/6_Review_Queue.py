@@ -7,7 +7,6 @@ from src.review import build_review_queue
 from src.tables import render_table
 
 
-st.set_page_config(page_title="Review Queue | HCZ Google Ads", layout="wide")
 apply_page_style()
 st.title("Review Queue")
 st.caption("Prioritized action list for campaign, search term, landing page, and mapping review.")

@@ -1,1 +1,3 @@
-from src.executive_summary import *
+from src.executive_summary import main
+
+main()

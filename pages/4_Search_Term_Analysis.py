@@ -67,7 +67,6 @@ def objective_mismatch(row):
     )
 
 
-st.set_page_config(page_title="Search Term Analysis | HCZ Google Ads", layout="wide")
 apply_page_style()
 st.title("Search Term Analysis")
 st.caption("Query management workflow for search relevance, negative keyword review, expansion opportunities, and objective alignment.")

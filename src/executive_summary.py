@@ -307,58 +307,63 @@ def render_campaign_watchouts(df):
             st.caption(campaign_name)
 
 
-apply_page_style()
+def main():
+    apply_page_style()
 
-st.title("HCZ Google Ads Executive Summary")
-st.caption("Internal reporting dashboard for spend, traffic, priority outcomes, and optimization priorities.")
+    st.title("HCZ Google Ads Executive Summary")
+    st.caption("Internal reporting dashboard for spend, traffic, priority outcomes, and optimization priorities.")
 
-try:
-    data, validation, _ = load_workbook()
-except Exception as exc:
-    st.error("Could not load the Google Sheet.")
-    st.info("Check that .streamlit/secrets.toml contains a valid service account and that the service account email has access to the workbook.")
-    st.exception(exc)
-    st.stop()
+    try:
+        data, validation, _ = load_workbook()
+    except Exception as exc:
+        st.error("Could not load the Google Sheet.")
+        st.info("Check that .streamlit/secrets.toml contains a valid service account and that the service account email has access to the workbook.")
+        st.exception(exc)
+        st.stop()
 
-campaign, search, landing = combine_primary_data(data)
-preset, start_date, end_date, comp_start, comp_end, comparison_label, filters = render_executive_sidebar(campaign, validation)
-current_campaign = filtered_period_df(campaign, start_date, end_date, filters)
-current_search = filtered_period_df(search, start_date, end_date, filters)
+    campaign, search, landing = combine_primary_data(data)
+    preset, start_date, end_date, comp_start, comp_end, comparison_label, filters = render_executive_sidebar(campaign, validation)
+    current_campaign = filtered_period_df(campaign, start_date, end_date, filters)
+    current_search = filtered_period_df(search, start_date, end_date, filters)
 
-summary = summarize(current_campaign)
-if summary.empty or current_campaign.empty:
-    st.warning("No campaign performance data is available yet. Add a model_performance_canonical tab or another supported campaign tab.")
-    st.stop()
+    summary = summarize(current_campaign)
+    if summary.empty or current_campaign.empty:
+        st.warning("No campaign performance data is available yet. Add a model_performance_canonical tab or another supported campaign tab.")
+        st.stop()
 
-current_metrics = calculate_period_metrics(campaign, start_date, end_date, filters)
-comparison_metrics = calculate_period_metrics(campaign, comp_start, comp_end, filters)
-enrollment_current = calculate_period_metrics(campaign[campaign["objective"].eq("Enrollment")], start_date, end_date, filters)
-enrollment_comparison = calculate_period_metrics(campaign[campaign["objective"].eq("Enrollment")], comp_start, comp_end, filters)
-recruitment_current = calculate_period_metrics(campaign[campaign["objective"].eq("Recruitment")], start_date, end_date, filters)
-recruitment_comparison = calculate_period_metrics(campaign[campaign["objective"].eq("Recruitment")], comp_start, comp_end, filters)
+    current_metrics = calculate_period_metrics(campaign, start_date, end_date, filters)
+    comparison_metrics = calculate_period_metrics(campaign, comp_start, comp_end, filters)
+    enrollment_current = calculate_period_metrics(campaign[campaign["objective"].eq("Enrollment")], start_date, end_date, filters)
+    enrollment_comparison = calculate_period_metrics(campaign[campaign["objective"].eq("Enrollment")], comp_start, comp_end, filters)
+    recruitment_current = calculate_period_metrics(campaign[campaign["objective"].eq("Recruitment")], start_date, end_date, filters)
+    recruitment_comparison = calculate_period_metrics(campaign[campaign["objective"].eq("Recruitment")], comp_start, comp_end, filters)
 
-render_period_cards("Account Overview", current_metrics, comparison_metrics, ACCOUNT_CARDS, comparison_label, columns=3)
-render_executive_callouts(current_metrics, comparison_metrics, enrollment_current, enrollment_comparison, recruitment_current, recruitment_comparison, comparison_label)
-render_period_cards("Enrollment Performance", enrollment_current, enrollment_comparison, ENROLLMENT_CARDS, comparison_label, columns=3)
-render_period_cards("Recruitment Performance", recruitment_current, recruitment_comparison, RECRUITMENT_CARDS, comparison_label, columns=3)
+    render_period_cards("Account Overview", current_metrics, comparison_metrics, ACCOUNT_CARDS, comparison_label, columns=3)
+    render_executive_callouts(current_metrics, comparison_metrics, enrollment_current, enrollment_comparison, recruitment_current, recruitment_comparison, comparison_label)
+    render_period_cards("Enrollment Performance", enrollment_current, enrollment_comparison, ENROLLMENT_CARDS, comparison_label, columns=3)
+    render_period_cards("Recruitment Performance", recruitment_current, recruitment_comparison, RECRUITMENT_CARDS, comparison_label, columns=3)
 
-st.subheader("Performance vs Benchmarks")
-benchmarks = get_campaign_type_benchmarks(data)
-latest, benchmark_month_used, used_incomplete_fallback = latest_complete_benchmarks(benchmarks)
-if latest.empty:
-    st.info(UNAVAILABLE_MESSAGE)
-else:
-    if used_incomplete_fallback:
-        st.warning("No complete benchmark month is available. Benchmark cards are using the latest available month, which may be partial.")
-    st.caption(f"Benchmark month: {benchmark_month_used:%b %Y}")
-    render_compact_benchmark_snapshot(latest)
-    if recruitment_caveat_present(latest):
-        st.warning(
-            f"{RECRUITMENT_CAVEAT}: Applications Submitted was not consistently tracked before July 2025, "
-            "so Recruitment YoY priority-conversion comparisons should be treated cautiously."
-        )
+    st.subheader("Performance vs Benchmarks")
+    benchmarks = get_campaign_type_benchmarks(data)
+    latest, benchmark_month_used, used_incomplete_fallback = latest_complete_benchmarks(benchmarks)
+    if latest.empty:
+        st.info(UNAVAILABLE_MESSAGE)
+    else:
+        if used_incomplete_fallback:
+            st.warning("No complete benchmark month is available. Benchmark cards are using the latest available month, which may be partial.")
+        st.caption(f"Benchmark month: {benchmark_month_used:%b %Y}")
+        render_compact_benchmark_snapshot(latest)
+        if recruitment_caveat_present(latest):
+            st.warning(
+                f"{RECRUITMENT_CAVEAT}: Applications Submitted was not consistently tracked before July 2025, "
+                "so Recruitment YoY priority-conversion comparisons should be treated cautiously."
+            )
 
-render_campaign_watchouts(current_campaign)
+    render_campaign_watchouts(current_campaign)
 
-with st.expander("Data Source Debug", expanded=False):
-    render_data_source_debug(current_campaign)
+    with st.expander("Data Source Debug", expanded=False):
+        render_data_source_debug(current_campaign)
+
+
+if __name__ == "__main__":
+    main()

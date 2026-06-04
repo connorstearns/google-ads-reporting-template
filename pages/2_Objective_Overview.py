@@ -195,7 +195,6 @@ def diagnose_campaign(row, objective, objective_average_primary_cpa, objective_a
     return "Monitor", "No immediate action"
 
 
-st.set_page_config(page_title="Objective Overview | HCZ Google Ads", layout="wide")
 apply_page_style()
 st.title("Objective Overview")
 st.caption("Objective-specific view of whether Enrollment campaigns drive Apply Now clicks and forms, and whether Recruitment campaigns drive submitted applications.")
