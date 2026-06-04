@@ -12,8 +12,9 @@ from src.conversion_logic import conversion_debug_audit
 from src.filters import apply_global_filters, render_sidebar
 from src.formatting import PRIORITY_CONVERSIONS_HELP, apply_page_style, kpi_card, money, number, percent, render_conversion_model_debug, render_data_source_debug, render_kpi_card
 from src.google_sheets import load_workbook
+from src.insight_utils import generate_enrollment_takeaways, generate_recruitment_takeaways
 from src.metrics import safe_divide, summarize
-from src.periods import get_filter_comparison_range, top_kpi_deltas
+from src.periods import calculate_period_metrics, get_filter_comparison_range, top_kpi_deltas
 from src.tables import render_table
 from src.transforms import combine_primary_data
 
@@ -111,6 +112,18 @@ def funnel_chart(row, objective):
     )
     fig.update_yaxes(autorange="reversed")
     return fig
+
+
+def render_takeaways(title, takeaways):
+    st.subheader(title)
+    body = "\n".join(f"- {takeaway['text']}" for takeaway in takeaways)
+    severities = {takeaway.get("severity", "neutral") for takeaway in takeaways}
+    if "warning" in severities:
+        st.warning(body)
+    elif "positive" in severities:
+        st.success(body)
+    else:
+        st.info(body)
 
 
 def tactic_diagnostics(campaign, objective):
@@ -242,6 +255,36 @@ recruitment_deltas = top_kpi_deltas(
         "application_completion_rate", "click_to_application_rate",
     ],
 )
+if start is not None and end is not None and comp_start is not None and comp_end is not None:
+    enrollment_current_metrics = calculate_period_metrics(
+        campaign_source[campaign_source["objective"].eq("Enrollment")],
+        start,
+        end,
+        filters,
+    )
+    enrollment_comparison_metrics = calculate_period_metrics(
+        campaign_source[campaign_source["objective"].eq("Enrollment")],
+        comp_start,
+        comp_end,
+        filters,
+    )
+    recruitment_current_metrics = calculate_period_metrics(
+        campaign_source[campaign_source["objective"].eq("Recruitment")],
+        start,
+        end,
+        filters,
+    )
+    recruitment_comparison_metrics = calculate_period_metrics(
+        campaign_source[campaign_source["objective"].eq("Recruitment")],
+        comp_start,
+        comp_end,
+        filters,
+    )
+else:
+    enrollment_current_metrics = {}
+    enrollment_comparison_metrics = {}
+    recruitment_current_metrics = {}
+    recruitment_comparison_metrics = {}
 
 st.header("Enrollment Performance")
 cols = st.columns(5)
@@ -258,6 +301,10 @@ with cols[3]: render_kpi_card("Cost per Apply Now Click", money(enrollment.get("
 with cols[4]: render_kpi_card("Cost per Enrollment Form", money(enrollment["cost_per_enrollment_form"]), delta=enrollment_deltas.get("cost_per_enrollment_form"), format_type="cost_efficiency")
 cols = st.columns(5)
 with cols[0]: render_kpi_card("Enrollment Priority CPA", priority_cpa_display(enrollment["priority_cpa"], enrollment["priority_conversions"]), delta=enrollment_deltas.get("priority_cpa"), format_type="cost_efficiency", help_text=PRIORITY_CONVERSIONS_HELP)
+render_takeaways(
+    "Enrollment Takeaways",
+    generate_enrollment_takeaways(enrollment_current_metrics, enrollment_comparison_metrics, comparison_label or "prior period"),
+)
 if enrollment["enrollment_apply_now_clicks"] > 0 and enrollment["enrollment_forms"] == 0:
     st.warning("Apply Now intent is not translating into form submissions.")
 st.plotly_chart(funnel_chart(enrollment, "Enrollment"), use_container_width=True)
@@ -279,6 +326,10 @@ with cols[3]: render_kpi_card("Cost per Career Click", money(recruitment.get("co
 with cols[4]: render_kpi_card("Cost per Application Submitted", money(recruitment.get("cost_per_application", recruitment.get("cost_per_application_submitted", 0))), delta=recruitment_deltas.get("cost_per_application_submitted"), format_type="cost_efficiency")
 cols = st.columns(5)
 with cols[0]: render_kpi_card("Recruitment Priority CPA", priority_cpa_display(recruitment["priority_cpa"], recruitment["priority_conversions"]), delta=recruitment_deltas.get("priority_cpa"), format_type="cost_efficiency", help_text=PRIORITY_CONVERSIONS_HELP)
+render_takeaways(
+    "Recruitment Takeaways",
+    generate_recruitment_takeaways(recruitment_current_metrics, recruitment_comparison_metrics, comparison_label or "prior period"),
+)
 if recruitment["career_clicks"] > 0 and recruitment["applications_submitted"] == 0:
     st.warning("Career interest is not translating into submitted applications.")
 st.plotly_chart(funnel_chart(recruitment, "Recruitment"), use_container_width=True)
