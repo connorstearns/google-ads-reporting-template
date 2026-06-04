@@ -16,7 +16,7 @@ DATE_PRESETS = [
 ]
 
 HIGHER_IS_BETTER = {
-    "impressions", "clicks", "total_conversions", "priority_conversions",
+    "spend", "impressions", "clicks", "total_conversions", "priority_conversions",
     "enrollment_apply_now_clicks", "enrollment_forms", "career_clicks",
     "applications_submitted", "form_share_of_priority",
     "enrollment_priority_conversions", "recruitment_priority_conversions",
@@ -32,7 +32,7 @@ LOWER_IS_BETTER = {
     "campaigns_to_investigate", "campaigns_to_optimize",
     "campaigns_with_quality_issues", "budget_limited_search_campaigns",
 }
-NEUTRAL_METRICS = {"spend"}
+NEUTRAL_METRICS = set()
 
 
 def get_date_range_from_preset(preset, today):

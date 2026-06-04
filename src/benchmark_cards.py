@@ -2,7 +2,7 @@ import pandas as pd
 import streamlit as st
 
 from .benchmarks import RECRUITMENT_CAVEAT
-from .formatting import money, number
+from .formatting import get_delta_color_mode, money, number
 
 
 ENROLLMENT_METRICS = [
@@ -51,7 +51,7 @@ def benchmark_delta(delta, benchmark, unavailable_label):
     if not valid_number(benchmark) or benchmark <= 0 or not valid_number(delta):
         return unavailable_label
     relation = "above" if delta >= 0 else "below"
-    return f"{abs(delta) * 100:,.1f}% {relation} benchmark"
+    return f"{delta * 100:+,.1f}% {relation} benchmark"
 
 
 def render_metric_card(row, spec):
@@ -66,7 +66,7 @@ def render_metric_card(row, spec):
         if spec.get("recruitment_caveat") and yoy_status == RECRUITMENT_CAVEAT
         else benchmark_delta(row.get(spec["yoy_delta"]), yoy, "No YoY benchmark").replace(" benchmark", " YoY benchmark")
     )
-    delta_color = "off" if not valid_number(trailing) or not valid_number(trailing_variance) else ("inverse" if spec["kind"] == "cost" else "normal")
+    delta_color = "off" if not valid_number(trailing) or not valid_number(trailing_variance) else get_delta_color_mode(spec["label"], spec["kind"], delta=trailing_variance)
     st.metric(spec["label"], format_metric_value(current, spec["kind"]), delta=trailing_delta, delta_color=delta_color)
     if current is None and spec.get("zero_helper"):
         st.caption(spec["zero_helper"])

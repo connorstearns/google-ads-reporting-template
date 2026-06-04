@@ -8,7 +8,7 @@ from src.benchmarks import (
     latest_complete_benchmarks,
     recruitment_caveat_present,
 )
-from src.formatting import apply_page_style
+from src.formatting import apply_page_style, get_delta_color_mode
 from src.google_sheets import clear_data_cache, load_workbook
 from src.transforms import combine_primary_data
 from src.filters import multiselect_if_available, show_validation
@@ -144,7 +144,8 @@ def render_period_cards(title, current_metrics, comparison_metrics, card_specs, 
         comparison = comparison_metrics.get(metric)
         direction = metric_direction(metric)
         delta = calculate_metric_delta(current, comparison, direction)
-        delta_text, delta_color, helper = format_delta(delta, comparison_label, direction)
+        delta_text, _, helper = format_delta(delta, comparison_label, direction)
+        delta_color = get_delta_color_mode(label, kind, direction == "lower", delta)
         with cols[index % columns]:
             st.metric(
                 label,

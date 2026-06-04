@@ -8,6 +8,67 @@ PRIORITY_CONVERSIONS_HELP = (
     "Apply Now clicks and Enrollment Forms. Recruitment priority conversions are Applications Submitted."
 )
 
+HIGHER_IS_BETTER_LABELS = {
+    "spend",
+    "total spend",
+    "clicks",
+    "impressions",
+    "conversions",
+    "reported conversions",
+    "all conversions",
+    "total conversions",
+    "priority conversions",
+    "enrollment priority conversions",
+    "recruitment priority conversions",
+    "enrollment apply now clicks",
+    "apply now clicks",
+    "enrollment forms",
+    "career clicks",
+    "applications submitted",
+    "micro conversions",
+    "primary conversions",
+    "ctr",
+    "cvr",
+    "conversion rate",
+    "apply now rate",
+    "form completion rate",
+    "click-to-form rate",
+    "click to form rate",
+    "career click rate",
+    "application completion rate",
+    "click-to-application rate",
+    "click to application rate",
+    "conversion quality ratio",
+    "search impression share",
+    "search top impression share",
+    "search absolute top impression share",
+    "campaigns eligible to scale",
+    "scale candidates",
+}
+
+LOWER_IS_BETTER_LABELS = {
+    "cpc",
+    "cpa",
+    "priority cpa",
+    "reported cpa",
+    "cost per conversion",
+    "cost per apply now click",
+    "cost per enrollment form",
+    "cost per career click",
+    "cost per application submitted",
+    "cost per application",
+    "campaigns to investigate",
+    "campaigns to optimize",
+    "quality issues",
+    "campaigns with quality issues",
+    "mapping gaps",
+    "validation errors",
+    "budget-limited search campaigns",
+    "budget limited search campaigns",
+}
+
+LOWER_IS_BETTER_TYPES = {"lower", "cost", "currency_inverse", "cost_efficiency"}
+
 
 def money(value, decimals=0):
     if value is None or (isinstance(value, float) and math.isnan(value)):
@@ -51,8 +112,73 @@ def apply_page_style():
     )
 
 
-def kpi_card(label, value, delta=None, help_text=None, delta_label=None, inverse_good=False):
-    delta_color = "inverse" if inverse_good else "normal"
+def normalize_metric_name(metric_name):
+    text = str(metric_name or "").strip().casefold()
+    text = text.replace("/", " per ")
+    text = text.replace("_", " ")
+    text = " ".join(text.replace("-", " - ").split())
+    text = text.replace(" - ", "-")
+    return text
+
+
+def get_metric_delta_direction(metric_name, metric_type=None, lower_is_better=None):
+    if lower_is_better is not None:
+        return "lower" if lower_is_better else "higher"
+    if metric_type in LOWER_IS_BETTER_TYPES:
+        return "lower"
+    normalized = normalize_metric_name(metric_name)
+    if normalized in LOWER_IS_BETTER_LABELS:
+        return "lower"
+    if normalized in HIGHER_IS_BETTER_LABELS:
+        return "higher"
+    if normalized.startswith("cost per ") or normalized.endswith(" cpa") or normalized in {"cpc", "cpa"}:
+        return "lower"
+    return "higher"
+
+
+def _delta_magnitude(delta):
+    if delta is None:
+        return None
+    try:
+        numeric = pd.to_numeric(delta, errors="coerce")
+    except (TypeError, ValueError):
+        numeric = None
+    if numeric is not None and not pd.isna(numeric):
+        return float(numeric)
+    text = str(delta).strip().replace(",", "")
+    if not text:
+        return None
+    match = pd.Series([text]).str.extract(r"([+-]?\d+(?:\.\d+)?)", expand=False).iloc[0]
+    if match is None or pd.isna(match):
+        return None
+    try:
+        return float(match)
+    except ValueError:
+        return None
+
+
+def get_delta_color_mode(metric_name, metric_type=None, lower_is_better=None, delta=None):
+    magnitude = _delta_magnitude(delta)
+    if magnitude is not None and abs(magnitude) < 0.0001:
+        return "off"
+    direction = get_metric_delta_direction(metric_name, metric_type, lower_is_better)
+    if direction == "lower":
+        return "inverse"
+    if direction == "neutral":
+        return "off"
+    return "normal"
+
+
+def _explicit_lower_is_better(inverse_good=False, lower_is_better=None):
+    if lower_is_better is not None:
+        return lower_is_better
+    if inverse_good:
+        return True
+    return None
+
+
+def kpi_card(label, value, delta=None, help_text=None, delta_label=None, inverse_good=False, lower_is_better=None, metric_type=None):
+    delta_color = get_delta_color_mode(label, metric_type, _explicit_lower_is_better(inverse_good, lower_is_better), delta)
     delta_text = labeled_delta(delta, delta_label)
     st.metric(label=label, value=value, delta=delta_text, help=help_text, delta_color=delta_color)
 
@@ -65,16 +191,18 @@ def render_kpi_card(
     help_text=None,
     format_type="number",
     inverse_good=False,
+    lower_is_better=None,
+    metric_type=None,
     delta_help=None,
 ):
-    lower_is_better = inverse_good or format_type in {"lower", "cost", "currency_inverse", "cost_efficiency"}
-    delta_color = "inverse" if lower_is_better else "normal"
+    effective_lower_is_better = _explicit_lower_is_better(inverse_good, lower_is_better)
+    delta_color = get_delta_color_mode(label, metric_type or format_type, effective_lower_is_better, delta)
     delta_text = labeled_delta(delta, delta_label)
     st.metric(label=label, value=value, delta=delta_text, help=help_text or delta_help, delta_color=delta_color)
 
 
 def labeled_delta(delta, delta_label=None):
-    if delta is None:
+    if delta is None or pd.isna(delta):
         return None
     if not delta_label:
         return delta
